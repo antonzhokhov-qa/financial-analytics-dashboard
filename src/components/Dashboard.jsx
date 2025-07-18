@@ -23,6 +23,7 @@ const Dashboard = () => {
     status: '',
     company: '',
     paymentMethod: '',
+    transactionType: '',
     dateRange: { start: '', end: '' },
     amountRange: { min: '', max: '' }
   })
@@ -91,6 +92,11 @@ const Dashboard = () => {
     // Фильтр по методу оплаты
     if (newFilters.paymentMethod) {
       filtered = filtered.filter(row => row.paymentMethod === newFilters.paymentMethod)
+    }
+    
+    // Фильтр по типу транзакции
+    if (newFilters.transactionType) {
+      filtered = filtered.filter(row => row.transactionType === newFilters.transactionType)
     }
     
     // Фильтр по дате
@@ -195,6 +201,7 @@ const Dashboard = () => {
                     status: '',
                     company: '',
                     paymentMethod: '',
+                    transactionType: '',
                     dateRange: { start: '', end: '' },
                     amountRange: { min: '', max: '' }
                   })

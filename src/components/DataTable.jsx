@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChevronDown, ChevronUp, Search, Filter, Download } from 'lucide-react'
 
 const DataTable = ({ data, dataType = 'merchant' }) => {
@@ -6,6 +6,11 @@ const DataTable = ({ data, dataType = 'merchant' }) => {
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(20)
+
+  // Сбрасываем страницу при изменении поиска
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, data])
 
   const currency = 'TRY'
   const currencyCode = 'TRY'
@@ -242,7 +247,7 @@ const DataTable = ({ data, dataType = 'merchant' }) => {
                   
                   <td className="px-6 py-4 text-sm text-gray-300">
                     <div>
-                      <div className="font-medium text-white">{row.userName || row.fullName || '-'}</div>
+                      <div className="font-medium text-white">{row.fullName || row.userName || '-'}</div>
                       {row.userId && (
                         <div className="text-xs text-gray-400">ID: {row.userId}</div>
                       )}

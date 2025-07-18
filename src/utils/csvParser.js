@@ -28,6 +28,11 @@ function normalizeData(data, format, dataType = 'merchant') {
       fee: parseFloat((row['Fee'] || row['Комиссия'] || '0').replace(',', '.')) || 0,
       feeRatio: row['Fee Ratio'] || '0%',
       
+      // Тип транзакции для аналитики
+      transactionType: row['Type'] || row['Тип'] || '',
+      isDeposit: (row['Type'] || row['Тип'] || '').toLowerCase() === 'deposit',
+      isWithdraw: (row['Type'] || row['Тип'] || '').toLowerCase() === 'withdraw',
+      
       // Пользователь
       userName: row['User name'] || row['Имя пользователя'] || row['Username'] || row['Пользователь'] || '',
       userId: row['User ıd'] || row['User id'] || row['Идентификатор пользователя'] || row['User ID'] || '',

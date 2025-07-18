@@ -16,6 +16,28 @@ export function calculateMetrics(data, dataType = 'merchant') {
     const status = row.status ? row.status.toLowerCase() : ''
     return dataType === 'merchant' ? status === 'canceled' : false
   }).length
+
+  // Анализ по типам транзакций
+  const deposits = data.filter(row => row.isDeposit)
+  const withdrawals = data.filter(row => row.isWithdraw)
+  
+  const depositMetrics = {
+    total: deposits.length,
+    successful: deposits.filter(row => {
+      const status = row.status ? row.status.toLowerCase() : ''
+      return dataType === 'merchant' ? status === 'completed' : status === 'success'
+    }).length,
+    amount: deposits.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0)
+  }
+  
+  const withdrawalMetrics = {
+    total: withdrawals.length,
+    successful: withdrawals.filter(row => {
+      const status = row.status ? row.status.toLowerCase() : ''
+      return dataType === 'merchant' ? status === 'completed' : status === 'success'
+    }).length,
+    amount: withdrawals.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0)
+  }
   
   console.log('Status breakdown:', { total, successful, failed, canceled })
   
@@ -123,6 +145,8 @@ export function calculateMetrics(data, dataType = 'merchant') {
     minAmount,
     companyStats,
     paymentMethodStats,
+    depositMetrics,
+    withdrawalMetrics,
     dataType
   }
   

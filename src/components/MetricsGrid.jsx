@@ -99,6 +99,24 @@ const MetricsGrid = ({ metrics, dataType = 'merchant' }) => {
       borderColor: 'border-cyan-500/30'
     },
     {
+      title: 'Депозиты',
+      value: metrics.depositMetrics.total.toLocaleString('tr-TR'),
+      subtitle: `${formatCurrency(metrics.depositMetrics.amount)} • ${metrics.depositMetrics.successful} успешных`,
+      icon: TrendingUp,
+      color: 'from-green-500 to-emerald-500',
+      bgColor: 'bg-green-500/20',
+      borderColor: 'border-green-500/30'
+    },
+    {
+      title: 'Выплаты',
+      value: metrics.withdrawalMetrics.total.toLocaleString('tr-TR'),
+      subtitle: `${formatCurrency(metrics.withdrawalMetrics.amount)} • ${metrics.withdrawalMetrics.successful} успешных`,
+      icon: TrendingDown,
+      color: 'from-orange-500 to-red-500',
+      bgColor: 'bg-orange-500/20',
+      borderColor: 'border-orange-500/30'
+    },
+    {
       title: 'Максимальная сумма',
       value: formatCurrency(metrics.maxAmount),
       subtitle: 'Самая крупная операция',

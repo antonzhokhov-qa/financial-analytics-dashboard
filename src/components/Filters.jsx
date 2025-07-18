@@ -34,6 +34,11 @@ const Filters = ({ data, filters, onFiltersChange, dataType = 'merchant' }) => {
     label: method 
   }))
 
+  const transactionTypeOptions = getUniqueValues('transactionType').map(type => ({ 
+    value: type, 
+    label: type === 'Deposit' ? 'Депозит' : type === 'Withdraw' ? 'Выплата' : type 
+  }))
+
   // Обновляем локальные фильтры при изменении пропсов
   useEffect(() => {
     setLocalFilters(filters)
@@ -50,6 +55,7 @@ const Filters = ({ data, filters, onFiltersChange, dataType = 'merchant' }) => {
       status: '',
       company: '',
       paymentMethod: '',
+      transactionType: '',
       dateRange: { start: '', end: '' },
       amountRange: { min: '', max: '' }
     }
@@ -63,6 +69,7 @@ const Filters = ({ data, filters, onFiltersChange, dataType = 'merchant' }) => {
       localFilters.status ||
       localFilters.company ||
       localFilters.paymentMethod ||
+      localFilters.transactionType ||
       localFilters.dateRange.start ||
       localFilters.dateRange.end ||
       localFilters.amountRange.min ||
@@ -76,6 +83,7 @@ const Filters = ({ data, filters, onFiltersChange, dataType = 'merchant' }) => {
     if (localFilters.status) count++
     if (localFilters.company) count++
     if (localFilters.paymentMethod) count++
+    if (localFilters.transactionType) count++
     if (localFilters.dateRange.start || localFilters.dateRange.end) count++
     if (localFilters.amountRange.min || localFilters.amountRange.max) count++
     return count
@@ -181,6 +189,26 @@ const Filters = ({ data, filters, onFiltersChange, dataType = 'merchant' }) => {
               >
                 <option value="">Все методы</option>
                 {paymentMethodOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Фильтр по типу транзакции */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-white flex items-center">
+                <Filter className="w-4 h-4 text-orange-400 mr-2" />
+                Тип транзакции
+              </label>
+              <select
+                value={localFilters.transactionType}
+                onChange={(e) => setLocalFilters(prev => ({ ...prev, transactionType: e.target.value }))}
+                className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Все типы</option>
+                {transactionTypeOptions.map(option => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
