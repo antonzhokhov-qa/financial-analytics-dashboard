@@ -106,6 +106,53 @@ const Filters = ({ data, filters, onFiltersChange, dataType = 'merchant' }) => {
         </div>
         
         <div className="flex items-center space-x-2">
+          {/* Счетчик отфильтрованных записей */}
+          <span className="text-sm text-gray-300">
+            {(() => {
+              // Простой подсчет отфильтрованных записей
+              let filtered = [...data]
+              
+              if (localFilters.status) {
+                filtered = filtered.filter(row => row.status === localFilters.status)
+              }
+              if (localFilters.company) {
+                filtered = filtered.filter(row => row.company === localFilters.company)
+              }
+              if (localFilters.paymentMethod) {
+                filtered = filtered.filter(row => row.paymentMethod === localFilters.paymentMethod)
+              }
+              if (localFilters.transactionType) {
+                filtered = filtered.filter(row => row.transactionType === localFilters.transactionType)
+              }
+              if (localFilters.dateRange.start || localFilters.dateRange.end) {
+                filtered = filtered.filter(row => {
+                  if (!row.createdAt) return true
+                  const rowDate = new Date(row.createdAt)
+                  if (isNaN(rowDate.getTime())) return true
+                  
+                  const rowDateOnly = new Date(rowDate.getFullYear(), rowDate.getMonth(), rowDate.getDate())
+                  
+                  if (localFilters.dateRange.start) {
+                    const startDate = new Date(localFilters.dateRange.start)
+                    if (isNaN(startDate.getTime())) return true
+                    if (rowDateOnly < startDate) return false
+                  }
+                  
+                  if (localFilters.dateRange.end) {
+                    const endDate = new Date(localFilters.dateRange.end)
+                    if (isNaN(endDate.getTime())) return true
+                    endDate.setHours(23, 59, 59, 999)
+                    if (rowDate > endDate) return false
+                  }
+                  
+                  return true
+                })
+              }
+              
+              return `${filtered.length} из ${data.length} записей`
+            })()}
+          </span>
+          
           {hasActiveFilters() && (
             <div className="flex items-center space-x-2 px-3 py-1 bg-blue-500/20 border border-blue-500/30 rounded-full">
               <span className="text-sm text-blue-300">
@@ -231,6 +278,18 @@ const Filters = ({ data, filters, onFiltersChange, dataType = 'merchant' }) => {
                 }))}
                 className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
+              {/* Показываем диапазон дат в данных */}
+              {data.length > 0 && (
+                <div className="text-xs text-gray-400">
+                  Диапазон данных: {(() => {
+                    const dates = data.map(row => new Date(row.createdAt)).filter(date => !isNaN(date.getTime()))
+                    if (dates.length === 0) return 'Нет валидных дат'
+                    const minDate = new Date(Math.min(...dates))
+                    const maxDate = new Date(Math.max(...dates))
+                    return `${minDate.toISOString().split('T')[0]} - ${maxDate.toISOString().split('T')[0]}`
+                  })()}
+                </div>
+              )}
             </div>
 
             {/* Фильтр по дате окончания */}

@@ -77,6 +77,7 @@ const Dashboard = () => {
 
   // Обработка фильтрации данных
   const handleFiltersChange = (newFilters) => {
+    console.log('Applying filters:', newFilters)
     let filtered = [...data]
     
     // Фильтр по статусу
@@ -101,15 +102,36 @@ const Dashboard = () => {
     
     // Фильтр по дате
     if (newFilters.dateRange.start || newFilters.dateRange.end) {
+      const beforeFilter = filtered.length
+      console.log('Date filter applied. Before:', beforeFilter, 'Range:', newFilters.dateRange)
+      
       filtered = filtered.filter(row => {
-        const rowDate = new Date(row.createdAt)
-        const startDate = newFilters.dateRange.start ? new Date(newFilters.dateRange.start) : null
-        const endDate = newFilters.dateRange.end ? new Date(newFilters.dateRange.end) : null
+        if (!row.createdAt) return true // Если нет даты, не фильтруем
         
-        if (startDate && rowDate < startDate) return false
-        if (endDate && rowDate > endDate) return false
+        const rowDate = new Date(row.createdAt)
+        if (isNaN(rowDate.getTime())) return true // Если дата невалидная, не фильтруем
+        
+        // Получаем только дату без времени для сравнения
+        const rowDateOnly = new Date(rowDate.getFullYear(), rowDate.getMonth(), rowDate.getDate())
+        
+        if (newFilters.dateRange.start) {
+          const startDate = new Date(newFilters.dateRange.start)
+          if (isNaN(startDate.getTime())) return true
+          if (rowDateOnly < startDate) return false
+        }
+        
+        if (newFilters.dateRange.end) {
+          const endDate = new Date(newFilters.dateRange.end)
+          if (isNaN(endDate.getTime())) return true
+          // Для конечной даты включаем весь день (до 23:59:59)
+          endDate.setHours(23, 59, 59, 999)
+          if (rowDate > endDate) return false
+        }
+        
         return true
       })
+      
+      console.log('After date filter:', filtered.length, 'rows remaining')
     }
     
     // Фильтр по сумме
@@ -123,6 +145,7 @@ const Dashboard = () => {
       })
     }
     
+    console.log('Final filtered data:', filtered.length, 'out of', data.length, 'total rows')
     setFilters(newFilters)
     setFilteredData(filtered)
   }
