@@ -1,4 +1,4 @@
-import { BarChart3, TrendingUp, DollarSign, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
+import { BarChart3, TrendingUp, DollarSign, AlertTriangle, CheckCircle, XCircle, Clock, Building, CreditCard } from 'lucide-react'
 
 function MetricsGrid({ metrics }) {
   const metricCards = [
@@ -20,7 +20,7 @@ function MetricsGrid({ metrics }) {
     },
     {
       title: 'Общий оборот',
-      value: `${metrics.successfulRevenue.toLocaleString('ru-RU', {maximumFractionDigits: 0})} TRY`,
+      value: `${metrics.successfulRevenue.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽`,
       icon: DollarSign,
       color: 'text-green-400',
       bgColor: 'bg-green-500/20',
@@ -28,7 +28,7 @@ function MetricsGrid({ metrics }) {
     },
     {
       title: 'Средний чек',
-      value: `${metrics.averageAmount.toLocaleString('ru-RU', {maximumFractionDigits: 0})} TRY`,
+      value: `${metrics.averageAmount.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽`,
       icon: TrendingUp,
       color: 'text-purple-400',
       bgColor: 'bg-purple-500/20',
@@ -43,12 +43,36 @@ function MetricsGrid({ metrics }) {
       glowColor: 'shadow-green-500/25'
     },
     {
+      title: 'Отмененные операции',
+      value: metrics.canceled.toLocaleString(),
+      icon: Clock,
+      color: 'text-yellow-400',
+      bgColor: 'bg-yellow-500/20',
+      glowColor: 'shadow-yellow-500/25'
+    },
+    {
       title: 'Неудачные операции',
       value: metrics.failed.toLocaleString(),
       icon: XCircle,
       color: 'text-red-400',
       bgColor: 'bg-red-500/20',
       glowColor: 'shadow-red-500/25'
+    },
+    {
+      title: 'Общие комиссии',
+      value: `${metrics.totalFees.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽`,
+      icon: DollarSign,
+      color: 'text-orange-400',
+      bgColor: 'bg-orange-500/20',
+      glowColor: 'shadow-orange-500/25'
+    },
+    {
+      title: 'Максимальная сумма',
+      value: `${metrics.maxAmount.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽`,
+      icon: TrendingUp,
+      color: 'text-indigo-400',
+      bgColor: 'bg-indigo-500/20',
+      glowColor: 'shadow-indigo-500/25'
     }
   ]
 
@@ -80,12 +104,15 @@ function MetricsGrid({ metrics }) {
                   metric.color.includes('green') ? 'from-green-500 to-green-600' :
                   metric.color.includes('purple') ? 'from-purple-500 to-purple-600' :
                   metric.color.includes('red') ? 'from-red-500 to-red-600' :
-                  'from-yellow-500 to-yellow-600'
+                  metric.color.includes('yellow') ? 'from-yellow-500 to-yellow-600' :
+                  metric.color.includes('orange') ? 'from-orange-500 to-orange-600' :
+                  'from-indigo-500 to-indigo-600'
                 }`}
                 style={{ 
-                  width: metric.title === 'Конверсия' ? `${metrics.conversionRate}%` : 
+                  width: metric.title === 'Конверсия' ? `${Math.min(metrics.conversionRate, 100)}%` : 
                          metric.title === 'Всего операций' ? '100%' :
                          metric.title === 'Успешные операции' ? `${(metrics.successful / metrics.total) * 100}%` :
+                         metric.title === 'Отмененные операции' ? `${(metrics.canceled / metrics.total) * 100}%` :
                          metric.title === 'Неудачные операции' ? `${(metrics.failed / metrics.total) * 100}%` :
                          '75%'
                 }}

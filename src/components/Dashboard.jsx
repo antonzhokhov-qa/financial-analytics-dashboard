@@ -10,24 +10,45 @@ import { calculateMetrics, generateInsights } from '../utils/analytics'
 function Dashboard({ data, onReset }) {
   const [filters, setFilters] = useState({
     status: '',
-    state: '',
-    minAmount: '',
-    maxAmount: ''
+    company: '',
+    paymentMethod: '',
+    dateFrom: '',
+    dateTo: '',
+    amountMin: '',
+    amountMax: ''
   })
   const [showFilters, setShowFilters] = useState(false)
 
   const filteredData = useMemo(() => {
     return data.filter(row => {
-      const amount = parseFloat(row['Initial Amount']) || 0
-      const status = row.Status ? row.Status.toLowerCase() : ''
-      const state = row['Operation State'] ? row['Operation State'].toLowerCase() : ''
+      const amount = parseFloat(row.amount) || 0
+      const status = row.status ? row.status.toLowerCase() : ''
+      const company = row.company || ''
+      const paymentMethod = row.paymentMethod || ''
+      const createdAt = row.createdAt || ''
       
+      // Фильтр по статусу
       const statusMatch = !filters.status || status === filters.status.toLowerCase()
-      const stateMatch = !filters.state || state === filters.state.toLowerCase()
-      const minAmountMatch = !filters.minAmount || amount >= parseFloat(filters.minAmount)
-      const maxAmountMatch = !filters.maxAmount || amount <= parseFloat(filters.maxAmount)
       
-      return statusMatch && stateMatch && minAmountMatch && maxAmountMatch
+      // Фильтр по компании
+      const companyMatch = !filters.company || company === filters.company
+      
+      // Фильтр по методу оплаты
+      const paymentMethodMatch = !filters.paymentMethod || paymentMethod === filters.paymentMethod
+      
+      // Фильтр по дате "с"
+      const dateFromMatch = !filters.dateFrom || (createdAt && createdAt >= filters.dateFrom)
+      
+      // Фильтр по дате "до"
+      const dateToMatch = !filters.dateTo || (createdAt && createdAt <= filters.dateTo + ' 23:59:59')
+      
+      // Фильтр по минимальной сумме
+      const amountMinMatch = !filters.amountMin || amount >= parseFloat(filters.amountMin)
+      
+      // Фильтр по максимальной сумме
+      const amountMaxMatch = !filters.amountMax || amount <= parseFloat(filters.amountMax)
+      
+      return statusMatch && companyMatch && paymentMethodMatch && dateFromMatch && dateToMatch && amountMinMatch && amountMaxMatch
     })
   }, [data, filters])
 
@@ -41,11 +62,16 @@ function Dashboard({ data, onReset }) {
   const resetFilters = () => {
     setFilters({
       status: '',
-      state: '',
-      minAmount: '',
-      maxAmount: ''
+      company: '',
+      paymentMethod: '',
+      dateFrom: '',
+      dateTo: '',
+      amountMin: '',
+      amountMax: ''
     })
   }
+
+  const hasActiveFilters = filters.status || filters.company || filters.paymentMethod || filters.dateFrom || filters.dateTo || filters.amountMin || filters.amountMax
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -59,7 +85,7 @@ function Dashboard({ data, onReset }) {
             <Filter className="w-4 h-4" />
             Фильтры
           </button>
-          {(filters.status || filters.state || filters.minAmount || filters.maxAmount) && (
+          {hasActiveFilters && (
             <button
               onClick={resetFilters}
               className="btn-secondary flex items-center gap-2"
@@ -80,10 +106,26 @@ function Dashboard({ data, onReset }) {
       {/* Фильтры */}
       {showFilters && (
         <Filters
-          filters={filters}
-          onFilterChange={handleFilterChange}
-          onReset={resetFilters}
+          onFiltersChange={handleFilterChange}
+          data={data}
         />
+      )}
+
+      {/* Информация о фильтрации */}
+      {hasActiveFilters && (
+        <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <div className="text-blue-300">
+              <strong>Применены фильтры:</strong> Показано {filteredData.length} из {data.length} операций
+            </div>
+            <button
+              onClick={resetFilters}
+              className="text-blue-300 hover:text-blue-200 text-sm"
+            >
+              Очистить все
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Метрики */}

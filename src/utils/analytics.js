@@ -3,68 +3,113 @@ export function calculateMetrics(data) {
   
   const total = data.length
   const successful = data.filter(row => {
-    const status = row.Status ? row.Status.toLowerCase() : ''
-    return status === 'success'
+    const status = row.status ? row.status.toLowerCase() : ''
+    return status === 'completed'
   }).length
   
   const failed = data.filter(row => {
-    const status = row.Status ? row.Status.toLowerCase() : ''
-    return status === 'fail'
+    const status = row.status ? row.status.toLowerCase() : ''
+    return status === 'failed'
   }).length
   
-  console.log('Status breakdown:', { total, successful, failed })
+  const canceled = data.filter(row => {
+    const status = row.status ? row.status.toLowerCase() : ''
+    return status === 'canceled'
+  }).length
+  
+  console.log('Status breakdown:', { total, successful, failed, canceled })
   
   // Проверим несколько строк для отладки
   console.log('First 3 rows status check:', data.slice(0, 3).map(row => ({
-    status: row.Status,
-    normalizedStatus: row.Status ? row.Status.toLowerCase() : '',
-    isSuccess: row.Status ? row.Status.toLowerCase() === 'success' : false
+    status: row.status,
+    normalizedStatus: row.status ? row.status.toLowerCase() : '',
+    isCompleted: row.status ? row.status.toLowerCase() === 'completed' : false
   })))
   
   const conversionRate = total > 0 ? (successful / total) * 100 : 0
   
   const successfulRevenue = data
     .filter(row => {
-      const status = row.Status ? row.Status.toLowerCase() : ''
-      return status === 'success'
+      const status = row.status ? row.status.toLowerCase() : ''
+      return status === 'completed'
     })
     .reduce((sum, row) => {
-      const amount = parseFloat(row['Charged Amount']) || 0
+      const amount = parseFloat(row.amount) || 0
       return sum + amount
     }, 0)
   
-  const totalInitialAmount = data.reduce((sum, row) => {
-    const amount = parseFloat(row['Initial Amount']) || 0
+  const totalAmount = data.reduce((sum, row) => {
+    const amount = parseFloat(row.amount) || 0
     return sum + amount
   }, 0)
   
   const lostRevenue = data
     .filter(row => {
-      const status = row.Status ? row.Status.toLowerCase() : ''
-      return status === 'fail'
+      const status = row.status ? row.status.toLowerCase() : ''
+      return status === 'failed' || status === 'canceled'
     })
     .reduce((sum, row) => {
-      const amount = parseFloat(row['Initial Amount']) || 0
+      const amount = parseFloat(row.amount) || 0
       return sum + amount
     }, 0)
   
-  const averageAmount = total > 0 ? totalInitialAmount / total : 0
+  const totalFees = data.reduce((sum, row) => {
+    const fee = parseFloat(row.fee) || 0
+    return sum + fee
+  }, 0)
   
-  const amounts = data.map(row => parseFloat(row['Initial Amount']) || 0)
+  const averageAmount = total > 0 ? totalAmount / total : 0
+  
+  const amounts = data.map(row => parseFloat(row.amount) || 0)
   const maxAmount = amounts.length > 0 ? Math.max(...amounts) : 0
   const minAmount = amounts.length > 0 ? Math.min(...amounts) : 0
+  
+  // Анализ по компаниям
+  const companyStats = {}
+  data.forEach(row => {
+    const company = row.company || 'Unknown'
+    if (!companyStats[company]) {
+      companyStats[company] = { total: 0, completed: 0, failed: 0, canceled: 0, revenue: 0 }
+    }
+    companyStats[company].total++
+    companyStats[company].revenue += parseFloat(row.amount) || 0
+    
+    const status = row.status ? row.status.toLowerCase() : ''
+    if (status === 'completed') companyStats[company].completed++
+    else if (status === 'failed') companyStats[company].failed++
+    else if (status === 'canceled') companyStats[company].canceled++
+  })
+  
+  // Анализ по методам оплаты
+  const paymentMethodStats = {}
+  data.forEach(row => {
+    const method = row.paymentMethod || 'Unknown'
+    if (!paymentMethodStats[method]) {
+      paymentMethodStats[method] = { total: 0, completed: 0, failed: 0, canceled: 0 }
+    }
+    paymentMethodStats[method].total++
+    
+    const status = row.status ? row.status.toLowerCase() : ''
+    if (status === 'completed') paymentMethodStats[method].completed++
+    else if (status === 'failed') paymentMethodStats[method].failed++
+    else if (status === 'canceled') paymentMethodStats[method].canceled++
+  })
   
   const metrics = {
     total,
     successful,
     failed,
+    canceled,
     conversionRate,
     successfulRevenue,
     lostRevenue,
+    totalAmount,
+    totalFees,
     averageAmount,
     maxAmount,
     minAmount,
-    totalInitialAmount
+    companyStats,
+    paymentMethodStats
   }
   
   console.log('Calculated metrics:', metrics)
@@ -89,21 +134,54 @@ export function generateInsights(data, metrics) {
     })
   }
   
-  // Убираем анализ конверсии по состояниям, так как все операции депозитные
+  // Анализ отмененных операций
+  if (metrics.canceled > 0) {
+    const cancelRate = (metrics.canceled / metrics.total) * 100
+    insights.push({
+      type: 'info',
+      icon: '⏸️',
+      text: `${metrics.canceled} отмененных операций (${cancelRate.toFixed(1)}%). Возможно, стоит улучшить UX.`
+    })
+  }
   
-  const highValueOperations = data.filter(row => parseFloat(row['Initial Amount']) > metrics.averageAmount * 2).length
+  // Анализ по компаниям
+  const topCompany = Object.entries(metrics.companyStats)
+    .sort(([,a], [,b]) => b.revenue - a.revenue)[0]
+  
+  if (topCompany) {
+    insights.push({
+      type: 'info',
+      icon: '🏢',
+      text: `Топ компания: ${topCompany[0]} с выручкой ${topCompany[1].revenue.toLocaleString('ru-RU')} ₽`
+    })
+  }
+  
+  // Анализ методов оплаты
+  const topMethod = Object.entries(metrics.paymentMethodStats)
+    .sort(([,a], [,b]) => b.total - a.total)[0]
+  
+  if (topMethod) {
+    const methodConversion = (topMethod[1].completed / topMethod[1].total) * 100
+    insights.push({
+      type: 'info',
+      icon: '💳',
+      text: `Популярный метод: ${topMethod[0]} (${methodConversion.toFixed(1)}% конверсия)`
+    })
+  }
+  
+  const highValueOperations = data.filter(row => parseFloat(row.amount) > metrics.averageAmount * 2).length
   if (highValueOperations > 0) {
     insights.push({
       type: 'info',
       icon: '💎',
-      text: `${highValueOperations} операций с высокой стоимостью (>${(metrics.averageAmount * 2).toLocaleString('ru-RU', {maximumFractionDigits: 0})} TRY).`
+      text: `${highValueOperations} операций с высокой стоимостью (>${(metrics.averageAmount * 2).toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽).`
     })
   }
   
   insights.push({
     type: 'danger',
     icon: '💸',
-    text: `Потенциальные потери: ${metrics.lostRevenue.toLocaleString('ru-RU', {maximumFractionDigits: 0})} TRY из-за неудачных операций.`
+    text: `Потенциальные потери: ${metrics.lostRevenue.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽ из-за неудачных операций.`
   })
   
   return insights
@@ -119,7 +197,7 @@ export function getAmountRanges(data) {
   }
   
   data.forEach(row => {
-    const amount = parseFloat(row['Initial Amount']) || 0
+    const amount = parseFloat(row.amount) || 0
     if (amount <= 500) ranges['0-500']++
     else if (amount <= 1000) ranges['501-1000']++
     else if (amount <= 2000) ranges['1001-2000']++
@@ -141,14 +219,14 @@ export function getConversionByAmount(data) {
   
   return ranges.map(range => {
     const rangeData = data.filter(row => {
-      const amount = parseFloat(row['Initial Amount']) || 0
+      const amount = parseFloat(row.amount) || 0
       return amount >= range.min && amount <= range.max
     })
     
     const total = rangeData.length
     const successful = rangeData.filter(row => {
-      const status = row.Status ? row.Status.toLowerCase() : ''
-      return status === 'success'
+      const status = row.status ? row.status.toLowerCase() : ''
+      return status === 'completed'
     }).length
     
     return {
@@ -161,71 +239,147 @@ export function getConversionByAmount(data) {
 }
 
 export function getTopAmounts(data, limit = 10) {
-  const amounts = data.map(row => parseFloat(row['Initial Amount']) || 0)
+  const amounts = data.map(row => parseFloat(row.amount) || 0)
   return amounts.sort((a, b) => b - a).slice(0, limit)
 }
 
-export function getStateDistribution(data) {
-  const states = {}
+export function getStatusDistribution(data) {
+  const statuses = {}
   data.forEach(row => {
-    const state = row['Operation State'] || 'unknown'
-    states[state] = (states[state] || 0) + 1
+    const status = row.status || 'unknown'
+    statuses[status] = (statuses[status] || 0) + 1
   })
-  return states
+  return statuses
+}
+
+export function getCompanyDistribution(data) {
+  const companies = {}
+  data.forEach(row => {
+    const company = row.company || 'Unknown'
+    companies[company] = (companies[company] || 0) + 1
+  })
+  return companies
+}
+
+export function getPaymentMethodDistribution(data) {
+  const methods = {}
+  data.forEach(row => {
+    const method = row.paymentMethod || 'Unknown'
+    methods[method] = (methods[method] || 0) + 1
+  })
+  return methods
 }
 
 export function getTimeSeriesData(data) {
-  // Группировка данных по времени (примерная реализация)
+  // Группировка данных по времени
   const timeGroups = {}
   
   data.forEach(row => {
-    // Примерная группировка по дням
-    const date = new Date().toISOString().split('T')[0]
+    let date
+    if (row.createdAt) {
+      // Парсим дату создания
+      const dateStr = row.createdAt.split(' ')[0] // Берем только дату
+      date = dateStr
+    } else {
+      // Если нет даты создания, используем текущую дату
+      date = new Date().toISOString().split('T')[0]
+    }
+    
     if (!timeGroups[date]) {
-      timeGroups[date] = { total: 0, successful: 0, failed: 0 }
+      timeGroups[date] = { total: 0, completed: 0, failed: 0, canceled: 0, revenue: 0 }
     }
     
     timeGroups[date].total++
-    if (row.Status === 'success') {
-      timeGroups[date].successful++
-    } else {
+    timeGroups[date].revenue += parseFloat(row.amount) || 0
+    
+    const status = row.status ? row.status.toLowerCase() : ''
+    if (status === 'completed') {
+      timeGroups[date].completed++
+    } else if (status === 'failed') {
       timeGroups[date].failed++
+    } else if (status === 'canceled') {
+      timeGroups[date].canceled++
     }
   })
   
   return Object.entries(timeGroups).map(([date, stats]) => ({
     date,
     ...stats,
-    conversionRate: (stats.successful / stats.total) * 100
+    conversionRate: (stats.completed / stats.total) * 100
   }))
+}
+
+export function getTopUsers(data, limit = 10) {
+  const userStats = {}
+  
+  data.forEach(row => {
+    const userId = row.userId || 'Unknown'
+    const userName = row.userName || row.fullName || 'Unknown'
+    
+    if (!userStats[userId]) {
+      userStats[userId] = {
+        id: userId,
+        name: userName,
+        total: 0,
+        completed: 0,
+        failed: 0,
+        canceled: 0,
+        totalAmount: 0
+      }
+    }
+    
+    userStats[userId].total++
+    userStats[userId].totalAmount += parseFloat(row.amount) || 0
+    
+    const status = row.status ? row.status.toLowerCase() : ''
+    if (status === 'completed') userStats[userId].completed++
+    else if (status === 'failed') userStats[userId].failed++
+    else if (status === 'canceled') userStats[userId].canceled++
+  })
+  
+  return Object.values(userStats)
+    .sort((a, b) => b.totalAmount - a.totalAmount)
+    .slice(0, limit)
 }
 
 export function detectAnomalies(data) {
   const anomalies = []
   
-  // Обнаружение необычно больших сумм
-  const amounts = data.map(row => parseFloat(row['Initial Amount']) || 0)
-  const avgAmount = amounts.reduce((a, b) => a + b, 0) / amounts.length
-  const stdDev = Math.sqrt(amounts.reduce((sq, n) => sq + Math.pow(n - avgAmount, 2), 0) / amounts.length)
+  // Аномалии по суммам
+  const amounts = data.map(row => parseFloat(row.amount) || 0)
+  const mean = amounts.reduce((a, b) => a + b, 0) / amounts.length
+  const std = Math.sqrt(amounts.reduce((sq, n) => sq + Math.pow(n - mean, 2), 0) / amounts.length)
   
-  const largeAmounts = amounts.filter(amount => amount > avgAmount + 2 * stdDev)
-  if (largeAmounts.length > 0) {
-    anomalies.push({
-      type: 'large_amount',
-      count: largeAmounts.length,
-      description: 'Операции с необычно большими суммами'
-    })
-  }
+  data.forEach((row, index) => {
+    const amount = parseFloat(row.amount) || 0
+    if (amount > mean + 2 * std) {
+      anomalies.push({
+        type: 'high_amount',
+        row: index + 1,
+        value: amount,
+        description: `Необычно высокая сумма: ${amount.toLocaleString('ru-RU')} ₽`
+      })
+    }
+  })
   
-  // Обнаружение частых отказов
-  const recentFailures = data.filter(row => row.Status === 'fail').length
-  if (recentFailures > data.length * 0.7) {
-    anomalies.push({
-      type: 'high_failure_rate',
-      count: recentFailures,
-      description: 'Высокий процент отказов'
-    })
-  }
+  // Аномалии по времени обработки
+  data.forEach((row, index) => {
+    if (row.createdAt && row.processedAt) {
+      const created = new Date(row.createdAt)
+      const processed = new Date(row.processedAt)
+      const processingTime = processed - created
+      
+      // Если обработка заняла больше 30 минут
+      if (processingTime > 30 * 60 * 1000) {
+        anomalies.push({
+          type: 'slow_processing',
+          row: index + 1,
+          value: processingTime / (60 * 1000),
+          description: `Медленная обработка: ${Math.round(processingTime / (60 * 1000))} минут`
+        })
+      }
+    }
+  })
   
   return anomalies
 } 

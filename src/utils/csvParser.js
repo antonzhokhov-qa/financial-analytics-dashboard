@@ -61,6 +61,127 @@ function splitRecords(text) {
   }
 }
 
+// Функция для нормализации данных из разных форматов
+function normalizeData(data, format) {
+  if (format === 'provider') {
+    // Нормализация для формата провайдера
+    return data.map(row => ({
+      // Основные поля
+      id: row['Идентификатор отслеживания'] || row['Tracking ID'] || '',
+      status: row['Status'] || '',
+      amount: parseFloat((row['Amount'] || row['Сумма транзакции'] || '0').replace(',', '.')) || 0,
+      type: row['Тип'] || row['Type'] || '',
+      company: row['Компания'] || row['Company'] || '',
+      fee: parseFloat((row['Fee'] || '0').replace(',', '.')) || 0,
+      feeRatio: row['Fee Ratio'] || '0%',
+      
+      // Пользователь
+      userName: row['Имя пользователя'] || row['Username'] || '',
+      userId: row['Идентификатор пользователя'] || row['User ID'] || '',
+      fullName: row['Имя'] || row['Full Name'] || '',
+      
+      // Время
+      createdAt: row['Время создания'] || row['Created At'] || '',
+      processedAt: row['Время обработки'] || row['Processed At'] || '',
+      
+      // Платежная информация
+      paymentMethod: row['Метод оплаты'] || row['Payment Method'] || '',
+      paymentGateway: row['Payment Gateway'] || '',
+      recipientName: row['Имя получателя'] || row['Recipient Name'] || '',
+      recipientAccount: row['Номер счета получателя'] || row['Recipient Account'] || '',
+      
+      // Техническая информация
+      hash: row['Хэш-код'] || row['Hash'] || '',
+      ipAddress: row['IP адрес клиента'] || row['IP Address'] || '',
+      receipt: row['Квитанция'] || row['Receipt'] || '',
+      explanation: row['Объяснение'] || row['Explanation'] || '',
+      explanationType: row['[Explanation type]'] || row['Explanation Type'] || '',
+      
+      // Дополнительные поля для совместимости
+      linkId: row['Идентификатор ссылки'] || row['Link ID'] || '',
+      
+      // Вычисляемые поля
+      isCompleted: (row['Status'] || '').toLowerCase() === 'completed',
+      isCanceled: (row['Status'] || '').toLowerCase() === 'canceled',
+      isFailed: (row['Status'] || '').toLowerCase() === 'failed',
+      
+      // Форматированные суммы
+      amountFormatted: new Intl.NumberFormat('ru-RU', { 
+        style: 'currency', 
+        currency: 'RUB' 
+      }).format(parseFloat((row['Amount'] || row['Сумма транзакции'] || '0').replace(',', '.')) || 0),
+      
+      feeFormatted: new Intl.NumberFormat('ru-RU', { 
+        style: 'currency', 
+        currency: 'RUB' 
+      }).format(parseFloat((row['Fee'] || '0').replace(',', '.')) || 0)
+    }))
+  } else {
+    // Нормализация для старого формата
+    return data.map(row => ({
+      id: row['ID'] || row['Tracking ID'] || '',
+      status: row['Status'] || row['Operation State'] || '',
+      amount: parseFloat((row['Initial Amount'] || row['Amount'] || '0').replace(',', '.')) || 0,
+      type: row['Type'] || row['Operation Type'] || '',
+      company: row['Company'] || '',
+      fee: parseFloat((row['Fee'] || '0').replace(',', '.')) || 0,
+      feeRatio: row['Fee Ratio'] || '0%',
+      
+      userName: row['Username'] || row['User Name'] || '',
+      userId: row['User ID'] || '',
+      fullName: row['Full Name'] || row['Name'] || '',
+      
+      createdAt: row['Created At'] || row['Creation Date'] || '',
+      processedAt: row['Processed At'] || row['Processing Date'] || '',
+      
+      paymentMethod: row['Payment Method'] || '',
+      paymentGateway: row['Payment Gateway'] || '',
+      recipientName: row['Recipient Name'] || '',
+      recipientAccount: row['Recipient Account'] || '',
+      
+      hash: row['Hash'] || '',
+      ipAddress: row['IP Address'] || '',
+      receipt: row['Receipt'] || '',
+      explanation: row['Explanation'] || '',
+      explanationType: row['Explanation Type'] || '',
+      
+      linkId: row['Link ID'] || '',
+      
+      isCompleted: (row['Status'] || '').toLowerCase() === 'completed',
+      isCanceled: (row['Status'] || '').toLowerCase() === 'canceled',
+      isFailed: (row['Status'] || '').toLowerCase() === 'failed',
+      
+      amountFormatted: new Intl.NumberFormat('ru-RU', { 
+        style: 'currency', 
+        currency: 'RUB' 
+      }).format(parseFloat((row['Initial Amount'] || row['Amount'] || '0').replace(',', '.')) || 0),
+      
+      feeFormatted: new Intl.NumberFormat('ru-RU', { 
+        style: 'currency', 
+        currency: 'RUB' 
+      }).format(parseFloat((row['Fee'] || '0').replace(',', '.')) || 0)
+    }))
+  }
+}
+
+// Функция для определения формата данных
+function detectDataFormat(headers) {
+  const headerStr = headers.join(' ').toLowerCase()
+  
+  // Проверяем наличие русских заголовков (формат провайдера)
+  if (headerStr.includes('идентификатор') || headerStr.includes('статус') || headerStr.includes('сумма')) {
+    return 'provider'
+  }
+  
+  // Проверяем наличие английских заголовков (старый формат)
+  if (headerStr.includes('tracking id') || headerStr.includes('operation state') || headerStr.includes('initial amount')) {
+    return 'legacy'
+  }
+  
+  // По умолчанию считаем новым форматом
+  return 'provider'
+}
+
 // Альтернативный парсер для тестирования
 export function parseCSVAlternative(text) {
   console.log('=== ALTERNATIVE CSV PARSER ===')
@@ -151,6 +272,10 @@ export function parseCSV(text) {
   console.log('Headers found:', headers)
   console.log('Headers count:', headers.length)
   
+  // Определяем формат данных
+  const format = detectDataFormat(headers)
+  console.log('Detected format:', format)
+  
   const data = []
   
   for (let i = 1; i < records.length; i++) {
@@ -172,8 +297,6 @@ export function parseCSV(text) {
     if (i <= 3) {
       console.log(`Record ${i} parsed:`, row)
       console.log(`Status field: "${row.Status}"`)
-      console.log(`Operation State field: "${row['Operation State']}"`)
-      console.log(`Initial Amount field: "${row['Initial Amount']}"`)
     }
     
     data.push(row)
@@ -181,29 +304,25 @@ export function parseCSV(text) {
   
   console.log('Final parsed data count:', data.length)
   
+  // Нормализуем данные в зависимости от формата
+  const normalizedData = normalizeData(data, format)
+  console.log('Normalized data count:', normalizedData.length)
+  
   // Проверим статистику статусов
   const statusCounts = {}
-  data.forEach(row => {
-    const status = row.Status || 'empty'
+  normalizedData.forEach(row => {
+    const status = row.status || 'empty'
     statusCounts[status] = (statusCounts[status] || 0) + 1
   })
   
   console.log('Status distribution:', statusCounts)
   
-  // Проверим состояния операций
-  const stateCounts = {}
-  data.forEach(row => {
-    const state = row['Operation State'] || 'empty'
-    stateCounts[state] = (stateCounts[state] || 0) + 1
-  })
-  
-  console.log('Operation State distribution:', stateCounts)
-  
   // Если данных нет, попробуем альтернативный парсер
-  if (data.length === 0) {
+  if (normalizedData.length === 0) {
     console.log('Trying alternative parser...')
-    return parseCSVAlternative(text)
+    const altData = parseCSVAlternative(text)
+    return normalizeData(altData, format)
   }
   
-  return data
+  return normalizedData
 } 

@@ -24,16 +24,35 @@ function DataTable({ data }) {
 
   const getStatusColor = (status) => {
     const normalizedStatus = status ? status.toLowerCase() : ''
-    return normalizedStatus === 'success' 
-      ? 'text-green-300 bg-green-500/20 border-green-500/30' 
-      : 'text-red-300 bg-red-500/20 border-red-500/30'
+    if (normalizedStatus === 'completed') {
+      return 'text-green-300 bg-green-500/20 border-green-500/30'
+    } else if (normalizedStatus === 'canceled') {
+      return 'text-yellow-300 bg-yellow-500/20 border-yellow-500/30'
+    } else if (normalizedStatus === 'failed') {
+      return 'text-red-300 bg-red-500/20 border-red-500/30'
+    }
+    return 'text-gray-300 bg-gray-500/20 border-gray-500/30'
   }
 
-  const getOperationStateColor = (state) => {
-    const normalizedState = state ? state.toLowerCase() : ''
-    return normalizedState === 'complete' 
-      ? 'text-blue-300 bg-blue-500/20 border-blue-500/30'
-      : 'text-purple-300 bg-purple-500/20 border-purple-500/30'
+  const formatDate = (dateString) => {
+    if (!dateString) return '-'
+    try {
+      const date = new Date(dateString)
+      return date.toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    } catch {
+      return dateString
+    }
+  }
+
+  const truncateText = (text, maxLength = 20) => {
+    if (!text) return '-'
+    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text
   }
 
   return (
@@ -50,44 +69,53 @@ function DataTable({ data }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 border-b border-white/10">
-                <th className="text-left py-4 px-6 font-semibold text-white">Reference ID</th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Client Operation ID</th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Method</th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Состояние</th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Статус</th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Сумма (TRY)</th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Списано (TRY)</th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Результат</th>
+                <th className="text-left py-4 px-4 font-semibold text-white">ID</th>
+                <th className="text-left py-4 px-4 font-semibold text-white">Статус</th>
+                <th className="text-left py-4 px-4 font-semibold text-white">Сумма</th>
+                <th className="text-left py-4 px-4 font-semibold text-white">Компания</th>
+                <th className="text-left py-4 px-4 font-semibold text-white">Пользователь</th>
+                <th className="text-left py-4 px-4 font-semibold text-white">Метод оплаты</th>
+                <th className="text-left py-4 px-4 font-semibold text-white">Создано</th>
+                <th className="text-left py-4 px-4 font-semibold text-white">Обработано</th>
+                <th className="text-left py-4 px-4 font-semibold text-white">Комиссия</th>
               </tr>
             </thead>
             <tbody>
               {currentData.map((row, index) => {
-                const initialAmount = parseFloat(row['Initial Amount']) || 0
-                const chargedAmount = parseFloat(row['Charged Amount']) || 0
-                const status = row.Status ? row.Status.toLowerCase() : ''
-                const result = status === 'success' 
-                  ? `+${chargedAmount.toLocaleString('ru-RU')} TRY`
-                  : `${initialAmount.toLocaleString('ru-RU')} TRY`
+                const amount = parseFloat(row.amount) || 0
+                const fee = parseFloat(row.fee) || 0
+                const status = row.status || ''
                 
                 return (
                   <tr key={index} className="border-b border-white/5 hover:bg-white/5 transition-colors duration-200">
-                    <td className="py-4 px-6 font-mono text-xs text-gray-300">{row['Reference ID']}</td>
-                    <td className="py-4 px-6 text-white">{row['Client Operation id']}</td>
-                    <td className="py-4 px-6 text-white">{row['Method']}</td>
-                    <td className="py-4 px-6">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getOperationStateColor(row['Operation State'])}`}>
-                        {row['Operation State']}
+                    <td className="py-4 px-4 font-mono text-xs text-gray-300" title={row.id}>
+                      {truncateText(row.id, 12)}
+                    </td>
+                    <td className="py-4 px-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(status)}`}>
+                        {status}
                       </span>
                     </td>
-                    <td className="py-4 px-6">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(row.Status)}`}>
-                        {row.Status}
-                      </span>
+                    <td className="py-4 px-4 font-medium text-white">
+                      {amount.toLocaleString('ru-RU')} ₽
                     </td>
-                    <td className="py-4 px-6 font-medium text-white">{initialAmount.toLocaleString('ru-RU')}</td>
-                    <td className="py-4 px-6 font-medium text-white">{chargedAmount.toLocaleString('ru-RU')}</td>
-                    <td className={`py-4 px-6 font-bold ${status === 'success' ? 'text-green-400' : 'text-red-400'}`}>
-                      {result}
+                    <td className="py-4 px-4 text-white" title={row.company}>
+                      {truncateText(row.company, 15)}
+                    </td>
+                    <td className="py-4 px-4 text-white" title={row.fullName}>
+                      {truncateText(row.userName || row.fullName, 15)}
+                    </td>
+                    <td className="py-4 px-4 text-white" title={row.paymentMethod}>
+                      {truncateText(row.paymentMethod, 15)}
+                    </td>
+                    <td className="py-4 px-4 text-gray-300 text-xs">
+                      {formatDate(row.createdAt)}
+                    </td>
+                    <td className="py-4 px-4 text-gray-300 text-xs">
+                      {formatDate(row.processedAt)}
+                    </td>
+                    <td className="py-4 px-4 text-gray-300">
+                      {fee > 0 ? `${fee.toLocaleString('ru-RU')} ₽` : '-'}
                     </td>
                   </tr>
                 )
