@@ -1,20 +1,20 @@
-export function calculateMetrics(data) {
-  console.log('Calculating metrics for data:', data.length, 'rows')
+export function calculateMetrics(data, dataType = 'merchant') {
+  console.log('Calculating metrics for data:', data.length, 'rows, type:', dataType)
   
   const total = data.length
   const successful = data.filter(row => {
     const status = row.status ? row.status.toLowerCase() : ''
-    return status === 'completed'
+    return dataType === 'merchant' ? status === 'completed' : status === 'success'
   }).length
   
   const failed = data.filter(row => {
     const status = row.status ? row.status.toLowerCase() : ''
-    return status === 'failed'
+    return dataType === 'merchant' ? status === 'failed' : status === 'fail'
   }).length
   
   const canceled = data.filter(row => {
     const status = row.status ? row.status.toLowerCase() : ''
-    return status === 'canceled'
+    return dataType === 'merchant' ? status === 'canceled' : false
   }).length
   
   console.log('Status breakdown:', { total, successful, failed, canceled })
@@ -23,7 +23,9 @@ export function calculateMetrics(data) {
   console.log('First 3 rows status check:', data.slice(0, 3).map(row => ({
     status: row.status,
     normalizedStatus: row.status ? row.status.toLowerCase() : '',
-    isCompleted: row.status ? row.status.toLowerCase() === 'completed' : false
+    isCompleted: dataType === 'merchant' ? 
+      (row.status ? row.status.toLowerCase() === 'completed' : false) :
+      (row.status ? row.status.toLowerCase() === 'success' : false)
   })))
   
   const conversionRate = total > 0 ? (successful / total) * 100 : 0
@@ -31,7 +33,7 @@ export function calculateMetrics(data) {
   const successfulRevenue = data
     .filter(row => {
       const status = row.status ? row.status.toLowerCase() : ''
-      return status === 'completed'
+      return dataType === 'merchant' ? status === 'completed' : status === 'success'
     })
     .reduce((sum, row) => {
       const amount = parseFloat(row.amount) || 0
@@ -46,7 +48,11 @@ export function calculateMetrics(data) {
   const lostRevenue = data
     .filter(row => {
       const status = row.status ? row.status.toLowerCase() : ''
-      return status === 'failed' || status === 'canceled'
+      if (dataType === 'merchant') {
+        return status === 'failed' || status === 'canceled'
+      } else {
+        return status === 'fail'
+      }
     })
     .reduce((sum, row) => {
       const amount = parseFloat(row.amount) || 0
@@ -64,21 +70,23 @@ export function calculateMetrics(data) {
   const maxAmount = amounts.length > 0 ? Math.max(...amounts) : 0
   const minAmount = amounts.length > 0 ? Math.min(...amounts) : 0
   
-  // Анализ по компаниям
+  // Анализ по компаниям (только для провайдера)
   const companyStats = {}
-  data.forEach(row => {
-    const company = row.company || 'Unknown'
-    if (!companyStats[company]) {
-      companyStats[company] = { total: 0, completed: 0, failed: 0, canceled: 0, revenue: 0 }
-    }
-    companyStats[company].total++
-    companyStats[company].revenue += parseFloat(row.amount) || 0
-    
-    const status = row.status ? row.status.toLowerCase() : ''
-    if (status === 'completed') companyStats[company].completed++
-    else if (status === 'failed') companyStats[company].failed++
-    else if (status === 'canceled') companyStats[company].canceled++
-  })
+  if (dataType === 'merchant') {
+    data.forEach(row => {
+      const company = row.company || 'Unknown'
+      if (!companyStats[company]) {
+        companyStats[company] = { total: 0, completed: 0, failed: 0, canceled: 0, revenue: 0 }
+      }
+      companyStats[company].total++
+      companyStats[company].revenue += parseFloat(row.amount) || 0
+      
+      const status = row.status ? row.status.toLowerCase() : ''
+      if (status === 'completed') companyStats[company].completed++
+      else if (status === 'failed') companyStats[company].failed++
+      else if (status === 'canceled') companyStats[company].canceled++
+    })
+  }
   
   // Анализ по методам оплаты
   const paymentMethodStats = {}
@@ -90,9 +98,14 @@ export function calculateMetrics(data) {
     paymentMethodStats[method].total++
     
     const status = row.status ? row.status.toLowerCase() : ''
-    if (status === 'completed') paymentMethodStats[method].completed++
-    else if (status === 'failed') paymentMethodStats[method].failed++
-    else if (status === 'canceled') paymentMethodStats[method].canceled++
+    if (dataType === 'merchant') {
+      if (status === 'completed') paymentMethodStats[method].completed++
+      else if (status === 'failed') paymentMethodStats[method].failed++
+      else if (status === 'canceled') paymentMethodStats[method].canceled++
+    } else {
+      if (status === 'success') paymentMethodStats[method].completed++
+      else if (status === 'fail') paymentMethodStats[method].failed++
+    }
   })
   
   const metrics = {
@@ -109,7 +122,8 @@ export function calculateMetrics(data) {
     maxAmount,
     minAmount,
     companyStats,
-    paymentMethodStats
+    paymentMethodStats,
+    dataType
   }
   
   console.log('Calculated metrics:', metrics)
@@ -119,6 +133,7 @@ export function calculateMetrics(data) {
 
 export function generateInsights(data, metrics) {
   const insights = []
+  const { dataType } = metrics
   
   if (metrics.conversionRate < 50) {
     insights.push({
@@ -134,8 +149,8 @@ export function generateInsights(data, metrics) {
     })
   }
   
-  // Анализ отмененных операций
-  if (metrics.canceled > 0) {
+  // Анализ отмененных операций (только для провайдера)
+  if (dataType === 'merchant' && metrics.canceled > 0) {
     const cancelRate = (metrics.canceled / metrics.total) * 100
     insights.push({
       type: 'info',
@@ -144,16 +159,18 @@ export function generateInsights(data, metrics) {
     })
   }
   
-  // Анализ по компаниям
-  const topCompany = Object.entries(metrics.companyStats)
-    .sort(([,a], [,b]) => b.revenue - a.revenue)[0]
-  
-  if (topCompany) {
-    insights.push({
-      type: 'info',
-      icon: '🏢',
-      text: `Топ компания: ${topCompany[0]} с выручкой ${topCompany[1].revenue.toLocaleString('ru-RU')} ₽`
-    })
+  // Анализ по компаниям (только для провайдера)
+  if (dataType === 'merchant' && Object.keys(metrics.companyStats).length > 0) {
+    const topCompany = Object.entries(metrics.companyStats)
+      .sort(([,a], [,b]) => b.revenue - a.revenue)[0]
+    
+    if (topCompany) {
+      insights.push({
+        type: 'info',
+        icon: '🏢',
+        text: `Топ компания: ${topCompany[0]} с выручкой ${topCompany[1].revenue.toLocaleString('tr-TR')} TRY`
+      })
+    }
   }
   
   // Анализ методов оплаты
@@ -174,14 +191,14 @@ export function generateInsights(data, metrics) {
     insights.push({
       type: 'info',
       icon: '💎',
-      text: `${highValueOperations} операций с высокой стоимостью (>${(metrics.averageAmount * 2).toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽).`
+      text: `${highValueOperations} операций с высокой стоимостью (>${(metrics.averageAmount * 2).toLocaleString('tr-TR', {maximumFractionDigits: 0})} TRY).`
     })
   }
   
   insights.push({
-    type: 'danger',
-    icon: '💸',
-    text: `Потенциальные потери: ${metrics.lostRevenue.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽ из-за неудачных операций.`
+    type: 'info',
+    icon: '💰',
+    text: `Общая выручка: ${metrics.successfulRevenue.toLocaleString('tr-TR')} TRY, комиссии: ${metrics.totalFees.toLocaleString('tr-TR')} TRY`
   })
   
   return insights
@@ -208,7 +225,7 @@ export function getAmountRanges(data) {
   return ranges
 }
 
-export function getConversionByAmount(data) {
+export function getConversionByAmount(data, dataType = 'merchant') {
   const ranges = [
     { label: '0-500', min: 0, max: 500 },
     { label: '501-1000', min: 501, max: 1000 },
@@ -226,7 +243,7 @@ export function getConversionByAmount(data) {
     const total = rangeData.length
     const successful = rangeData.filter(row => {
       const status = row.status ? row.status.toLowerCase() : ''
-      return status === 'completed'
+      return dataType === 'merchant' ? status === 'completed' : status === 'success'
     }).length
     
     return {
@@ -243,7 +260,7 @@ export function getTopAmounts(data, limit = 10) {
   return amounts.sort((a, b) => b - a).slice(0, limit)
 }
 
-export function getStatusDistribution(data) {
+export function getStatusDistribution(data, dataType = 'merchant') {
   const statuses = {}
   data.forEach(row => {
     const status = row.status || 'unknown'
@@ -293,9 +310,9 @@ export function getTimeSeriesData(data) {
     timeGroups[date].revenue += parseFloat(row.amount) || 0
     
     const status = row.status ? row.status.toLowerCase() : ''
-    if (status === 'completed') {
+    if (status === 'completed' || status === 'success') {
       timeGroups[date].completed++
-    } else if (status === 'failed') {
+    } else if (status === 'failed' || status === 'fail') {
       timeGroups[date].failed++
     } else if (status === 'canceled') {
       timeGroups[date].canceled++
@@ -332,8 +349,8 @@ export function getTopUsers(data, limit = 10) {
     userStats[userId].totalAmount += parseFloat(row.amount) || 0
     
     const status = row.status ? row.status.toLowerCase() : ''
-    if (status === 'completed') userStats[userId].completed++
-    else if (status === 'failed') userStats[userId].failed++
+    if (status === 'completed' || status === 'success') userStats[userId].completed++
+    else if (status === 'failed' || status === 'fail') userStats[userId].failed++
     else if (status === 'canceled') userStats[userId].canceled++
   })
   
@@ -357,7 +374,7 @@ export function detectAnomalies(data) {
         type: 'high_amount',
         row: index + 1,
         value: amount,
-        description: `Необычно высокая сумма: ${amount.toLocaleString('ru-RU')} ₽`
+        description: `Необычно высокая сумма: ${amount.toLocaleString('ru-RU')}`
       })
     }
   })

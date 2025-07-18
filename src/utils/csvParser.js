@@ -11,155 +11,109 @@ function detectRecordSeparator(text) {
     }
   }
   
-  // Если обычные разделители не найдены, возможно данные в одной строке
-  // Попробуем найти паттерн повторяющихся ID
-  const idPattern = /01981[0-9a-f]{32}/g
-  const matches = text.match(idPattern)
-  
-  if (matches && matches.length > 1) {
-    console.log(`Found ${matches.length} record patterns, might be single-line CSV`)
-    return 'PATTERN_BASED'
-  }
-  
   return '\n' // По умолчанию
 }
 
-// Функция для разбития CSV на записи, если они в одной строке
-function splitRecords(text) {
-  const recordSeparator = detectRecordSeparator(text)
-  
-  if (recordSeparator === 'PATTERN_BASED') {
-    // Если записи в одной строке, попробуем разделить по паттерну ID
-    const idPattern = /(01981[0-9a-f]{32})/g
-    const parts = text.split(idPattern).filter(part => part.trim())
-    
-    const records = []
-    let currentRecord = ''
-    
-    for (let i = 0; i < parts.length; i++) {
-      if (parts[i].match(/^01981[0-9a-f]{32}$/)) {
-        // Это ID, начинаем новую запись
-        if (currentRecord) {
-          records.push(currentRecord.trim())
-        }
-        currentRecord = parts[i]
-      } else {
-        // Это продолжение записи
-        currentRecord += parts[i]
-      }
-    }
-    
-    if (currentRecord) {
-      records.push(currentRecord.trim())
-    }
-    
-    console.log(`Split into ${records.length} records by pattern`)
-    return records
-  } else {
-    // Обычное разделение по переносам строк
-    return text.split(recordSeparator)
-  }
-}
-
 // Функция для нормализации данных из разных форматов
-function normalizeData(data, format) {
-  if (format === 'provider') {
+function normalizeData(data, format, dataType = 'merchant') {
+  if (dataType === 'merchant') {
     // Нормализация для формата провайдера
     return data.map(row => ({
       // Основные поля
-      id: row['Идентификатор отслеживания'] || row['Tracking ID'] || '',
-      status: row['Status'] || '',
-      amount: parseFloat((row['Amount'] || row['Сумма транзакции'] || '0').replace(',', '.')) || 0,
-      type: row['Тип'] || row['Type'] || '',
-      company: row['Компания'] || row['Company'] || '',
-      fee: parseFloat((row['Fee'] || '0').replace(',', '.')) || 0,
+      id: row['Tracking Id'] || row['Идентификатор отслеживания'] || row['Tracking ID'] || row['ID'] || '',
+      status: row['Status'] || row['Статус'] || '',
+      amount: parseFloat((row['Amount'] || row['Transaction amount'] || row['Сумма транзакции'] || row['Сумма'] || '0').replace(',', '.')) || 0,
+      type: row['Type'] || row['Тип'] || '',
+      company: row['Company'] || row['Компания'] || '',
+      fee: parseFloat((row['Fee'] || row['Комиссия'] || '0').replace(',', '.')) || 0,
       feeRatio: row['Fee Ratio'] || '0%',
       
       // Пользователь
-      userName: row['Имя пользователя'] || row['Username'] || '',
-      userId: row['Идентификатор пользователя'] || row['User ID'] || '',
-      fullName: row['Имя'] || row['Full Name'] || '',
+      userName: row['User name'] || row['Имя пользователя'] || row['Username'] || row['Пользователь'] || '',
+      userId: row['User ıd'] || row['User id'] || row['Идентификатор пользователя'] || row['User ID'] || '',
+      fullName: row['Name'] || row['Имя'] || row['Full Name'] || '',
       
       // Время
-      createdAt: row['Время создания'] || row['Created At'] || '',
-      processedAt: row['Время обработки'] || row['Processed At'] || '',
+      createdAt: row['Creation time'] || row['Время создания'] || row['Created At'] || row['Дата создания'] || '',
+      processedAt: row['Processed time'] || row['Время обработки'] || row['Processed At'] || '',
       
       // Платежная информация
-      paymentMethod: row['Метод оплаты'] || row['Payment Method'] || '',
+      paymentMethod: row['Payment method'] || row['Метод оплаты'] || row['Payment Method'] || row['Способ оплаты'] || '',
       paymentGateway: row['Payment Gateway'] || '',
-      recipientName: row['Имя получателя'] || row['Recipient Name'] || '',
-      recipientAccount: row['Номер счета получателя'] || row['Recipient Account'] || '',
+      recipientName: row['Receiver Account Name'] || row['Имя получателя'] || row['Recipient Name'] || '',
+      recipientAccount: row['Receiver Account Number'] || row['Номер счета получателя'] || row['Recipient Account'] || '',
       
       // Техническая информация
-      hash: row['Хэш-код'] || row['Hash'] || '',
-      ipAddress: row['IP адрес клиента'] || row['IP Address'] || '',
-      receipt: row['Квитанция'] || row['Receipt'] || '',
-      explanation: row['Объяснение'] || row['Explanation'] || '',
+      hash: row['Hash code'] || row['Хэш-код'] || row['Hash'] || '',
+      ipAddress: row['Client Ip address'] || row['IP адрес клиента'] || row['IP Address'] || '',
+      receipt: row['Receipt'] || row['Квитанция'] || '',
+      explanation: row['Explanation'] || row['Объяснение'] || '',
       explanationType: row['[Explanation type]'] || row['Explanation Type'] || '',
       
       // Дополнительные поля для совместимости
-      linkId: row['Идентификатор ссылки'] || row['Link ID'] || '',
+      linkId: row['Reference Id'] || row['Идентификатор ссылки'] || row['Link ID'] || '',
       
       // Вычисляемые поля
-      isCompleted: (row['Status'] || '').toLowerCase() === 'completed',
-      isCanceled: (row['Status'] || '').toLowerCase() === 'canceled',
-      isFailed: (row['Status'] || '').toLowerCase() === 'failed',
+      isCompleted: (row['Status'] || row['Статус'] || '').toLowerCase() === 'completed',
+      isCanceled: (row['Status'] || row['Статус'] || '').toLowerCase() === 'canceled',
+      isFailed: (row['Status'] || row['Статус'] || '').toLowerCase() === 'failed',
       
-      // Форматированные суммы
-      amountFormatted: new Intl.NumberFormat('ru-RU', { 
+      // Форматированные суммы (в TRY для всех типов)
+      amountFormatted: new Intl.NumberFormat('tr-TR', { 
         style: 'currency', 
-        currency: 'RUB' 
-      }).format(parseFloat((row['Amount'] || row['Сумма транзакции'] || '0').replace(',', '.')) || 0),
+        currency: 'TRY' 
+      }).format(parseFloat((row['Amount'] || row['Transaction amount'] || row['Сумма транзакции'] || row['Сумма'] || '0').replace(',', '.')) || 0),
       
-      feeFormatted: new Intl.NumberFormat('ru-RU', { 
+      feeFormatted: new Intl.NumberFormat('tr-TR', { 
         style: 'currency', 
-        currency: 'RUB' 
-      }).format(parseFloat((row['Fee'] || '0').replace(',', '.')) || 0)
+        currency: 'TRY' 
+      }).format(parseFloat((row['Fee'] || row['Комиссия'] || '0').replace(',', '.')) || 0)
     }))
   } else {
-    // Нормализация для старого формата
+    // Нормализация для формата платформы
     return data.map(row => ({
-      id: row['ID'] || row['Tracking ID'] || '',
-      status: row['Status'] || row['Operation State'] || '',
-      amount: parseFloat((row['Initial Amount'] || row['Amount'] || '0').replace(',', '.')) || 0,
-      type: row['Type'] || row['Operation Type'] || '',
-      company: row['Company'] || '',
-      fee: parseFloat((row['Fee'] || '0').replace(',', '.')) || 0,
+      id: row['Reference ID'] || row['ID'] || row['ID операции'] || '',
+      status: row['Status'] || row['Статус'] || '',
+      amount: parseFloat((row['Initial Amount'] || row['Amount'] || row['Сумма'] || '0').replace(',', '.')) || 0,
+      type: row['Type'] || row['Operation Type'] || row['Тип операции'] || '',
+      company: row['Company'] || row['Компания'] || '',
+      fee: parseFloat((row['Fee'] || row['Комиссия'] || '0').replace(',', '.')) || 0,
       feeRatio: row['Fee Ratio'] || '0%',
       
-      userName: row['Username'] || row['User Name'] || '',
-      userId: row['User ID'] || '',
-      fullName: row['Full Name'] || row['Name'] || '',
+      userName: row['Username'] || row['User Name'] || row['Пользователь'] || '',
+      userId: row['User ID'] || row['ID пользователя'] || '',
+      fullName: row['Full Name'] || row['Name'] || row['Имя'] || '',
       
-      createdAt: row['Created At'] || row['Creation Date'] || '',
-      processedAt: row['Processed At'] || row['Processing Date'] || '',
+      createdAt: row['Created At'] || row['Creation Date'] || row['Дата создания'] || '',
+      processedAt: row['Processed At'] || row['Processing Date'] || row['Дата обработки'] || '',
       
-      paymentMethod: row['Payment Method'] || '',
+      paymentMethod: row['Method'] || row['Payment Method'] || row['Способ оплаты'] || '',
       paymentGateway: row['Payment Gateway'] || '',
-      recipientName: row['Recipient Name'] || '',
-      recipientAccount: row['Recipient Account'] || '',
+      recipientName: row['Recipient Name'] || row['Имя получателя'] || '',
+      recipientAccount: row['Recipient Account'] || row['Счет получателя'] || '',
       
-      hash: row['Hash'] || '',
-      ipAddress: row['IP Address'] || '',
-      receipt: row['Receipt'] || '',
-      explanation: row['Explanation'] || '',
-      explanationType: row['Explanation Type'] || '',
+      hash: row['Hash'] || row['Хэш'] || '',
+      ipAddress: row['IP Address'] || row['IP адрес'] || '',
+      receipt: row['Receipt'] || row['Квитанция'] || '',
+      explanation: row['Explanation'] || row['Объяснение'] || '',
+      explanationType: row['Explanation Type'] || row['Тип объяснения'] || '',
       
-      linkId: row['Link ID'] || '',
+      linkId: row['Link ID'] || row['ID ссылки'] || '',
       
-      isCompleted: (row['Status'] || '').toLowerCase() === 'completed',
-      isCanceled: (row['Status'] || '').toLowerCase() === 'canceled',
-      isFailed: (row['Status'] || '').toLowerCase() === 'failed',
+      isCompleted: (row['Status'] || row['Статус'] || '').toLowerCase() === 'success',
+      isCanceled: false, // Платформа не имеет отмененных статусов
+      isFailed: (row['Status'] || row['Статус'] || '').toLowerCase() === 'fail',
       
-      amountFormatted: new Intl.NumberFormat('ru-RU', { 
+      // Форматированные суммы (в TRY для всех типов)
+      amountFormatted: new Intl.NumberFormat('tr-TR', { 
         style: 'currency', 
-        currency: 'RUB' 
-      }).format(parseFloat((row['Initial Amount'] || row['Amount'] || '0').replace(',', '.')) || 0),
+        currency: 'TRY' 
+      }).format(parseFloat((row['Initial Amount'] || row['Amount'] || row['Сумма'] || '0').replace(',', '.')) || 0),
       
-      feeFormatted: new Intl.NumberFormat('ru-RU', { 
+      feeFormatted: new Intl.NumberFormat('tr-TR', { 
         style: 'currency', 
-        currency: 'RUB' 
-      }).format(parseFloat((row['Fee'] || '0').replace(',', '.')) || 0)
+        currency: 'TRY' 
+      }).format(parseFloat((row['Fee'] || row['Комиссия'] || '0').replace(',', '.')) || 0)
     }))
   }
 }
@@ -170,159 +124,104 @@ function detectDataFormat(headers) {
   
   // Проверяем наличие русских заголовков (формат провайдера)
   if (headerStr.includes('идентификатор') || headerStr.includes('статус') || headerStr.includes('сумма')) {
-    return 'provider'
+    return 'merchant'
   }
   
-  // Проверяем наличие английских заголовков (старый формат)
-  if (headerStr.includes('tracking id') || headerStr.includes('operation state') || headerStr.includes('initial amount')) {
-    return 'legacy'
+  // Проверяем наличие английских заголовков (формат провайдера)
+  if (headerStr.includes('tracking id') || headerStr.includes('status') || headerStr.includes('amount') || headerStr.includes('payment method')) {
+    return 'merchant'
   }
   
-  // По умолчанию считаем новым форматом
-  return 'provider'
+  // Проверяем наличие английских заголовков (формат платформы)
+  if (headerStr.includes('reference id') || headerStr.includes('initial amount') || headerStr.includes('method')) {
+    return 'platform'
+  }
+  
+  // По умолчанию считаем форматом провайдера
+  return 'merchant'
 }
 
-// Альтернативный парсер для тестирования
-export function parseCSVAlternative(text) {
-  console.log('=== ALTERNATIVE CSV PARSER ===')
-  
-  // Попробуем разные подходы к парсингу
-  const records = splitRecords(text)
-  console.log('Records after splitting:', records.length)
-  
-  if (records.length === 0) return []
-  
-  // Первая запись должна быть заголовками
-  const firstRecord = records[0].trim()
-  console.log('First record:', firstRecord)
-  
-  // Попробуем найти правильный разделитель
-  const delimiters = [';', ',', '\t', '|']
-  let bestDelimiter = ';'
-  let maxFields = 0
-  
-  delimiters.forEach(delimiter => {
-    const fields = firstRecord.split(delimiter)
-    console.log(`Delimiter "${delimiter}": ${fields.length} fields`)
-    if (fields.length > maxFields) {
-      maxFields = fields.length
-      bestDelimiter = delimiter
-    }
-  })
-  
-  console.log(`Best delimiter: "${bestDelimiter}" with ${maxFields} fields`)
-  
-  const headers = firstRecord.split(bestDelimiter).map(h => h.trim().replace(/"/g, ''))
-  console.log('Clean headers:', headers)
-  
-  const data = []
-  
-  for (let i = 1; i < records.length; i++) {
-    const record = records[i].trim()
-    if (!record) continue
-    
-    const values = record.split(bestDelimiter).map(v => v.trim().replace(/"/g, ''))
-    
-    const row = {}
-    headers.forEach((header, index) => {
-      row[header] = values[index] || ''
-    })
-    
-    data.push(row)
-  }
-  
-  console.log('Alternative parser result:', data.length, 'rows')
-  return data
-}
-
-export function parseCSV(text) {
+export function parseCSV(text, dataType = 'merchant') {
   console.log('=== CSV PARSER DEBUG ===')
+  console.log('Data type:', dataType)
   console.log('Raw text length:', text.length)
   console.log('First 500 chars:', text.substring(0, 500))
   
-  // Используем новую функцию для разделения записей
-  const records = splitRecords(text)
-  console.log('Records after splitting:', records.length)
-  
-  if (records.length === 0) {
-    console.error('No records found in CSV')
-    return []
-  }
-  
-  // Проверим разные варианты разделителей полей
-  const firstRecord = records[0].trim()
-  console.log('First record:', firstRecord)
-  console.log('Contains semicolon:', firstRecord.includes(';'))
-  console.log('Contains comma:', firstRecord.includes(','))
-  console.log('Contains tab:', firstRecord.includes('\t'))
-  
-  // Попробуем определить разделитель автоматически
-  let delimiter = ';'
-  if (firstRecord.includes(';')) {
-    delimiter = ';'
-  } else if (firstRecord.includes(',')) {
-    delimiter = ','
-  } else if (firstRecord.includes('\t')) {
-    delimiter = '\t'
-  }
-  
-  console.log('Using delimiter:', delimiter)
-  
-  const headers = firstRecord.split(delimiter).map(h => h.trim())
-  console.log('Headers found:', headers)
-  console.log('Headers count:', headers.length)
-  
-  // Определяем формат данных
-  const format = detectDataFormat(headers)
-  console.log('Detected format:', format)
-  
-  const data = []
-  
-  for (let i = 1; i < records.length; i++) {
-    const record = records[i].trim()
-    if (!record) continue
+  try {
+    // Разделяем на строки
+    const lines = text.split(/\r?\n/).filter(line => line.trim())
+    console.log('Lines found:', lines.length)
     
-    console.log(`Processing record ${i}:`, record.substring(0, 100) + '...')
-    
-    const values = record.split(delimiter)
-    console.log(`Values in record ${i}:`, values.length, 'values')
-    
-    const row = {}
-    
-    headers.forEach((header, index) => {
-      row[header] = values[index] ? values[index].trim() : ''
-    })
-    
-    // Детальная отладка первых строк
-    if (i <= 3) {
-      console.log(`Record ${i} parsed:`, row)
-      console.log(`Status field: "${row.Status}"`)
+    if (lines.length === 0) {
+      console.error('No lines found in CSV')
+      return []
     }
     
-    data.push(row)
+    // Первая строка - заголовки
+    const headerLine = lines[0].trim()
+    console.log('Header line:', headerLine)
+    
+    // Определяем разделитель
+    let delimiter = ';'
+    if (dataType === 'platform') {
+      delimiter = ','
+    } else {
+      // Автоопределение для провайдера
+      if (headerLine.includes(';')) {
+        delimiter = ';'
+      } else if (headerLine.includes(',')) {
+        delimiter = ','
+      } else if (headerLine.includes('\t')) {
+        delimiter = '\t'
+      }
+    }
+    
+    console.log('Using delimiter:', delimiter)
+    
+    // Парсим заголовки
+    const headers = headerLine.split(delimiter).map(h => h.trim().replace(/"/g, ''))
+    console.log('Headers:', headers)
+    
+    // Определяем формат данных
+    const format = detectDataFormat(headers)
+    console.log('Detected format:', format)
+    
+    const data = []
+    
+    // Парсим данные
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim()
+      if (!line) continue
+      
+      const values = line.split(delimiter).map(v => v.trim().replace(/"/g, ''))
+      
+      const row = {}
+      headers.forEach((header, index) => {
+        row[header] = values[index] || ''
+      })
+      
+      data.push(row)
+    }
+    
+    console.log('Parsed data count:', data.length)
+    
+    // Нормализуем данные
+    const normalizedData = normalizeData(data, format, dataType)
+    console.log('Normalized data count:', normalizedData.length)
+    
+    // Проверим статистику статусов
+    const statusCounts = {}
+    normalizedData.forEach(row => {
+      const status = row.status || 'empty'
+      statusCounts[status] = (statusCounts[status] || 0) + 1
+    })
+    
+    console.log('Status distribution:', statusCounts)
+    
+    return normalizedData
+    
+  } catch (error) {
+    console.error('Error parsing CSV:', error)
+    return []
   }
-  
-  console.log('Final parsed data count:', data.length)
-  
-  // Нормализуем данные в зависимости от формата
-  const normalizedData = normalizeData(data, format)
-  console.log('Normalized data count:', normalizedData.length)
-  
-  // Проверим статистику статусов
-  const statusCounts = {}
-  normalizedData.forEach(row => {
-    const status = row.status || 'empty'
-    statusCounts[status] = (statusCounts[status] || 0) + 1
-  })
-  
-  console.log('Status distribution:', statusCounts)
-  
-  // Если данных нет, попробуем альтернативный парсер
-  if (normalizedData.length === 0) {
-    console.log('Trying alternative parser...')
-    const altData = parseCSVAlternative(text)
-    return normalizeData(altData, format)
-  }
-  
-  return normalizedData
 } 

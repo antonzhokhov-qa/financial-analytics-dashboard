@@ -1,8 +1,12 @@
-import React from 'react'
-import EnhancedDashboard from './components/EnhancedDashboard'
+import Dashboard from './components/Dashboard'
+import './index.css'
 
 function App() {
-  return <EnhancedDashboard />
+  return (
+    <div className="App">
+      <Dashboard />
+    </div>
+  )
 }
 
 export default App 

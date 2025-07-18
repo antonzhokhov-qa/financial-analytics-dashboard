@@ -1,218 +1,341 @@
-import React, { useState } from 'react';
-import { Filter, Calendar, DollarSign, CheckCircle, Building, User, CreditCard } from 'lucide-react';
+import { useState, useEffect } from 'react'
+import { Filter, X, Calendar, DollarSign, Users, CreditCard } from 'lucide-react'
 
-const Filters = ({ onFiltersChange, data = [] }) => {
-  const [filters, setFilters] = useState({
-    status: '',
-    company: '',
-    paymentMethod: '',
-    dateFrom: '',
-    dateTo: '',
-    amountMin: '',
-    amountMax: ''
-  });
+const Filters = ({ data, filters, onFiltersChange, dataType = 'merchant' }) => {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [localFilters, setLocalFilters] = useState(filters)
+
+  const currency = 'TRY'
+  const sourceName = dataType === 'merchant' ? 'провайдера' : 'платформы'
 
   // Получаем уникальные значения для фильтров
-  const companies = [...new Set(data.map(row => row.company).filter(Boolean))].sort();
-  const paymentMethods = [...new Set(data.map(row => row.paymentMethod).filter(Boolean))].sort();
+  const getUniqueValues = (key) => {
+    const values = data.map(row => row[key]).filter(Boolean)
+    return [...new Set(values)].sort()
+  }
 
-  const handleFilterChange = (key, value) => {
-    const newFilters = { ...filters, [key]: value };
-    setFilters(newFilters);
-    onFiltersChange(newFilters);
-  };
+  const statusOptions = dataType === 'merchant' 
+    ? [
+        { value: 'completed', label: 'Завершено' },
+        { value: 'failed', label: 'Неудачно' },
+        { value: 'canceled', label: 'Отменено' }
+      ]
+    : [
+        { value: 'success', label: 'Успешно' },
+        { value: 'fail', label: 'Ошибка' }
+      ]
 
-  const clearFilters = () => {
-    const clearedFilters = {
+  const companyOptions = dataType === 'merchant' 
+    ? getUniqueValues('company').map(company => ({ value: company, label: company }))
+    : []
+
+  const paymentMethodOptions = getUniqueValues('paymentMethod').map(method => ({ 
+    value: method, 
+    label: method 
+  }))
+
+  // Обновляем локальные фильтры при изменении пропсов
+  useEffect(() => {
+    setLocalFilters(filters)
+  }, [filters])
+
+  // Применяем фильтры
+  const applyFilters = () => {
+    onFiltersChange(localFilters)
+  }
+
+  // Сбрасываем фильтры
+  const resetFilters = () => {
+    const resetFilters = {
       status: '',
       company: '',
       paymentMethod: '',
-      dateFrom: '',
-      dateTo: '',
-      amountMin: '',
-      amountMax: ''
-    };
-    setFilters(clearedFilters);
-    onFiltersChange(clearedFilters);
-  };
+      dateRange: { start: '', end: '' },
+      amountRange: { min: '', max: '' }
+    }
+    setLocalFilters(resetFilters)
+    onFiltersChange(resetFilters)
+  }
+
+  // Проверяем, есть ли активные фильтры
+  const hasActiveFilters = () => {
+    return (
+      localFilters.status ||
+      localFilters.company ||
+      localFilters.paymentMethod ||
+      localFilters.dateRange.start ||
+      localFilters.dateRange.end ||
+      localFilters.amountRange.min ||
+      localFilters.amountRange.max
+    )
+  }
+
+  // Получаем количество активных фильтров
+  const getActiveFiltersCount = () => {
+    let count = 0
+    if (localFilters.status) count++
+    if (localFilters.company) count++
+    if (localFilters.paymentMethod) count++
+    if (localFilters.dateRange.start || localFilters.dateRange.end) count++
+    if (localFilters.amountRange.min || localFilters.amountRange.max) count++
+    return count
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Заголовок секции */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-            <Filter className="w-5 h-5 text-white" />
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+            <Filter className="w-4 h-4 text-white" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-white">Фильтры</h2>
-            <p className="text-gray-300">Настройте параметры для анализа данных</p>
+            <h3 className="text-lg font-semibold text-white">Фильтры</h3>
+            <p className="text-sm text-gray-400">
+              Настройте отображение данных • Источник: {sourceName}
+            </p>
           </div>
         </div>
-        <button
-          onClick={clearFilters}
-          className="px-4 py-2 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30 transition-colors duration-200"
-        >
-          Очистить
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Фильтр по статусу */}
-        <div className="space-y-2">
-          <label className="flex items-center space-x-2 text-sm font-medium text-white">
-            <CheckCircle className="w-4 h-4" />
-            <span>Статус операции</span>
-          </label>
-          <select
-            value={filters.status}
-            onChange={(e) => handleFilterChange('status', e.target.value)}
-            className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
+        
+        <div className="flex items-center space-x-2">
+          {hasActiveFilters() && (
+            <div className="flex items-center space-x-2 px-3 py-1 bg-blue-500/20 border border-blue-500/30 rounded-full">
+              <span className="text-sm text-blue-300">
+                {getActiveFiltersCount()} активных фильтров
+              </span>
+              <button
+                onClick={resetFilters}
+                className="w-4 h-4 text-blue-300 hover:text-blue-200 transition-colors duration-200"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+          
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors duration-200 flex items-center space-x-2"
           >
-            <option value="">Все статусы</option>
-            <option value="completed">Завершены</option>
-            <option value="canceled">Отменены</option>
-            <option value="failed">Неудачные</option>
-          </select>
-        </div>
-
-        {/* Фильтр по компании */}
-        <div className="space-y-2">
-          <label className="flex items-center space-x-2 text-sm font-medium text-white">
-            <Building className="w-4 h-4" />
-            <span>Компания</span>
-          </label>
-          <select
-            value={filters.company}
-            onChange={(e) => handleFilterChange('company', e.target.value)}
-            className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
-          >
-            <option value="">Все компании</option>
-            {companies.map(company => (
-              <option key={company} value={company}>{company}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Фильтр по методу оплаты */}
-        <div className="space-y-2">
-          <label className="flex items-center space-x-2 text-sm font-medium text-white">
-            <CreditCard className="w-4 h-4" />
-            <span>Метод оплаты</span>
-          </label>
-          <select
-            value={filters.paymentMethod}
-            onChange={(e) => handleFilterChange('paymentMethod', e.target.value)}
-            className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
-          >
-            <option value="">Все методы</option>
-            {paymentMethods.map(method => (
-              <option key={method} value={method}>{method}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Фильтр по дате "с" */}
-        <div className="space-y-2">
-          <label className="flex items-center space-x-2 text-sm font-medium text-white">
-            <Calendar className="w-4 h-4" />
-            <span>Дата с</span>
-          </label>
-          <input
-            type="date"
-            value={filters.dateFrom}
-            onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
-            className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
-          />
-        </div>
-
-        {/* Фильтр по дате "до" */}
-        <div className="space-y-2">
-          <label className="flex items-center space-x-2 text-sm font-medium text-white">
-            <Calendar className="w-4 h-4" />
-            <span>Дата до</span>
-          </label>
-          <input
-            type="date"
-            value={filters.dateTo}
-            onChange={(e) => handleFilterChange('dateTo', e.target.value)}
-            className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
-          />
-        </div>
-
-        {/* Фильтр по минимальной сумме */}
-        <div className="space-y-2">
-          <label className="flex items-center space-x-2 text-sm font-medium text-white">
-            <DollarSign className="w-4 h-4" />
-            <span>Сумма от (₽)</span>
-          </label>
-          <input
-            type="number"
-            placeholder="0"
-            value={filters.amountMin}
-            onChange={(e) => handleFilterChange('amountMin', e.target.value)}
-            className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
-          />
-        </div>
-
-        {/* Фильтр по максимальной сумме */}
-        <div className="space-y-2">
-          <label className="flex items-center space-x-2 text-sm font-medium text-white">
-            <DollarSign className="w-4 h-4" />
-            <span>Сумма до (₽)</span>
-          </label>
-          <input
-            type="number"
-            placeholder="∞"
-            value={filters.amountMax}
-            onChange={(e) => handleFilterChange('amountMax', e.target.value)}
-            className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
-          />
+            <Filter className="w-4 h-4" />
+            <span>{isExpanded ? 'Скрыть' : 'Показать'} фильтры</span>
+          </button>
         </div>
       </div>
 
-      {/* Активные фильтры */}
-      {(filters.status || filters.company || filters.paymentMethod || filters.dateFrom || filters.dateTo || filters.amountMin || filters.amountMax) && (
-        <div className="flex flex-wrap gap-2">
-          <span className="text-sm text-gray-300">Активные фильтры:</span>
-          {filters.status && (
-            <span className="px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-sm">
-              Статус: {filters.status === 'completed' ? 'Завершены' : filters.status === 'canceled' ? 'Отменены' : 'Неудачные'}
-            </span>
-          )}
-          {filters.company && (
-            <span className="px-3 py-1 bg-green-500/20 text-green-300 rounded-full text-sm">
-              Компания: {filters.company}
-            </span>
-          )}
-          {filters.paymentMethod && (
-            <span className="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-full text-sm">
-              Метод: {filters.paymentMethod}
-            </span>
-          )}
-          {filters.dateFrom && (
-            <span className="px-3 py-1 bg-orange-500/20 text-orange-300 rounded-full text-sm">
-              С: {filters.dateFrom}
-            </span>
-          )}
-          {filters.dateTo && (
-            <span className="px-3 py-1 bg-orange-500/20 text-orange-300 rounded-full text-sm">
-              До: {filters.dateTo}
-            </span>
-          )}
-          {filters.amountMin && (
-            <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 rounded-full text-sm">
-              От: {filters.amountMin} ₽
-            </span>
-          )}
-          {filters.amountMax && (
-            <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 rounded-full text-sm">
-              До: {filters.amountMax} ₽
-            </span>
-          )}
+      {/* Панель фильтров */}
+      {isExpanded && (
+        <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Фильтр по статусу */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-white flex items-center">
+                <div className="w-4 h-4 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full mr-2"></div>
+                Статус операции
+              </label>
+              <select
+                value={localFilters.status}
+                onChange={(e) => setLocalFilters(prev => ({ ...prev, status: e.target.value }))}
+                className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Все статусы</option>
+                {statusOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Фильтр по компании (только для провайдера) */}
+            {dataType === 'merchant' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-white flex items-center">
+                  <Users className="w-4 h-4 text-blue-400 mr-2" />
+                  Компания
+                </label>
+                <select
+                  value={localFilters.company}
+                  onChange={(e) => setLocalFilters(prev => ({ ...prev, company: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Все компании</option>
+                  {companyOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Фильтр по методу оплаты */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-white flex items-center">
+                <CreditCard className="w-4 h-4 text-green-400 mr-2" />
+                Метод оплаты
+              </label>
+              <select
+                value={localFilters.paymentMethod}
+                onChange={(e) => setLocalFilters(prev => ({ ...prev, paymentMethod: e.target.value }))}
+                className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Все методы</option>
+                {paymentMethodOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Фильтр по дате начала */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-white flex items-center">
+                <Calendar className="w-4 h-4 text-purple-400 mr-2" />
+                Дата начала
+              </label>
+              <input
+                type="date"
+                value={localFilters.dateRange.start}
+                onChange={(e) => setLocalFilters(prev => ({ 
+                  ...prev, 
+                  dateRange: { ...prev.dateRange, start: e.target.value }
+                }))}
+                className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Фильтр по дате окончания */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-white flex items-center">
+                <Calendar className="w-4 h-4 text-purple-400 mr-2" />
+                Дата окончания
+              </label>
+              <input
+                type="date"
+                value={localFilters.dateRange.end}
+                onChange={(e) => setLocalFilters(prev => ({ 
+                  ...prev, 
+                  dateRange: { ...prev.dateRange, end: e.target.value }
+                }))}
+                className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Фильтр по минимальной сумме */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-white flex items-center">
+                <DollarSign className="w-4 h-4 text-green-400 mr-2" />
+                Минимальная сумма ({currency})
+              </label>
+              <input
+                type="number"
+                placeholder="0"
+                value={localFilters.amountRange.min}
+                onChange={(e) => setLocalFilters(prev => ({ 
+                  ...prev, 
+                  amountRange: { ...prev.amountRange, min: e.target.value }
+                }))}
+                className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Фильтр по максимальной сумме */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-white flex items-center">
+                <DollarSign className="w-4 h-4 text-green-400 mr-2" />
+                Максимальная сумма ({currency})
+              </label>
+              <input
+                type="number"
+                placeholder="Без ограничений"
+                value={localFilters.amountRange.max}
+                onChange={(e) => setLocalFilters(prev => ({ 
+                  ...prev, 
+                  amountRange: { ...prev.amountRange, max: e.target.value }
+                }))}
+                className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          {/* Кнопки управления */}
+          <div className="flex items-center justify-between pt-4 border-t border-white/10">
+            <div className="text-sm text-gray-400">
+              {hasActiveFilters() ? (
+                <span>
+                  Активно {getActiveFiltersCount()} фильтр{getActiveFiltersCount() !== 1 ? 'ов' : ''}
+                </span>
+              ) : (
+                <span>Фильтры не применены</span>
+              )}
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={resetFilters}
+                className="px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors duration-200"
+              >
+                Сбросить
+              </button>
+              
+              <button
+                onClick={applyFilters}
+                className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200 font-semibold"
+              >
+                Применить фильтры
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Быстрые фильтры */}
+      {!isExpanded && hasActiveFilters() && (
+        <div className="bg-white/5 backdrop-blur-xl rounded-xl p-4 border border-white/10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <span className="text-sm text-gray-300">Активные фильтры:</span>
+              <div className="flex flex-wrap gap-2">
+                {localFilters.status && (
+                  <span className="px-2 py-1 bg-blue-500/20 text-blue-300 rounded-full text-xs">
+                    Статус: {statusOptions.find(s => s.value === localFilters.status)?.label}
+                  </span>
+                )}
+                {localFilters.company && (
+                  <span className="px-2 py-1 bg-blue-500/20 text-blue-300 rounded-full text-xs">
+                    Компания: {localFilters.company}
+                  </span>
+                )}
+                {localFilters.paymentMethod && (
+                  <span className="px-2 py-1 bg-blue-500/20 text-blue-300 rounded-full text-xs">
+                    Метод: {localFilters.paymentMethod}
+                  </span>
+                )}
+                {(localFilters.dateRange.start || localFilters.dateRange.end) && (
+                  <span className="px-2 py-1 bg-blue-500/20 text-blue-300 rounded-full text-xs">
+                    Дата: {localFilters.dateRange.start || '...'} - {localFilters.dateRange.end || '...'}
+                  </span>
+                )}
+                {(localFilters.amountRange.min || localFilters.amountRange.max) && (
+                  <span className="px-2 py-1 bg-blue-500/20 text-blue-300 rounded-full text-xs">
+                    Сумма: {localFilters.amountRange.min || '0'} - {localFilters.amountRange.max || '∞'} {currency}
+                  </span>
+                )}
+              </div>
+            </div>
+            
+            <button
+              onClick={resetFilters}
+              className="text-blue-400 hover:text-blue-300 text-sm transition-colors duration-200"
+            >
+              Очистить все
+            </button>
+          </div>
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default Filters; 
+export default Filters 
