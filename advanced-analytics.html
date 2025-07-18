@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Расширенная аналитика операций</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .filters {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .filter-group label {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .filter-group select, .filter-group input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .upload-section {
+            padding: 30px;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .upload-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            padding: 20px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .stat-card h3 {
+            font-size: 1em;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .chart-container {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .chart-container h3 {
+            text-align: center;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .table-section {
+            padding: 20px;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            font-size: 12px;
+        }
+
+        .data-table th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 8px;
+            text-align: left;
+        }
+
+        .data-table td {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .data-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        .fail {
+            color: #dc3545;
+            font-weight: bold;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+
+        .export-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .filters {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Расширенная аналитика операций</h1>
+            <p>Детальный анализ данных с фильтрами и экспортом</p>
+        </div>
+
+        <div class="upload-section">
+            <input type="file" id="csvFile" class="file-input" accept=".csv">
+            <button class="upload-btn" onclick="document.getElementById('csvFile').click()">
+                📁 Выбрать CSV файл
+            </button>
+            <button class="export-btn" onclick="exportData()" id="exportBtn" style="display: none;">
+                📥 Экспорт в Excel
+            </button>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">
+            <h3>⏳ Обработка данных...</h3>
+        </div>
+
+        <div id="analytics" style="display: none;">
+            <div class="filters">
+                <div class="filter-group">
+                    <label>Статус:</label>
+                    <select id="statusFilter" onchange="applyFilters()">
+                        <option value="">Все</option>
+                        <option value="success">Успешные</option>
+                        <option value="fail">Неудачные</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Состояние:</label>
+                    <select id="stateFilter" onchange="applyFilters()">
+                        <option value="">Все</option>
+                        <option value="complete">Завершенные</option>
+                        <option value="in_process">В процессе</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Мин. сумма:</label>
+                    <input type="number" id="minAmount" placeholder="0" onchange="applyFilters()">
+                </div>
+                <div class="filter-group">
+                    <label>Макс. сумма:</label>
+                    <input type="number" id="maxAmount" placeholder="∞" onchange="applyFilters()">
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Общее количество</h3>
+                    <div class="stat-value" id="totalOperations">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Успешные</h3>
+                    <div class="stat-value" id="successfulOperations">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Неудачные</h3>
+                    <div class="stat-value" id="failedOperations">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Общая сумма</h3>
+                    <div class="stat-value" id="totalAmount">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Средняя сумма</h3>
+                    <div class="stat-value" id="averageAmount">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Процент успеха</h3>
+                    <div class="stat-value" id="successRate">0%</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Макс. сумма</h3>
+                    <div class="stat-value" id="maxAmountValue">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Мин. сумма</h3>
+                    <div class="stat-value" id="minAmountValue">0</div>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <h3>Статус операций</h3>
+                    <canvas id="statusChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>Распределение сумм</h3>
+                    <canvas id="amountChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>Состояние операций</h3>
+                    <canvas id="stateChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>Топ-10 сумм</h3>
+                    <canvas id="topAmountsChart"></canvas>
+                </div>
+                <div class="chart-container full-width">
+                    <h3>Динамика по времени (по Reference ID)</h3>
+                    <canvas id="timelineChart"></canvas>
+                </div>
+            </div>
+
+            <div class="table-section">
+                <h3>Детали операций (первые 100 записей)</h3>
+                <div style="overflow-x: auto;">
+                    <table class="data-table" id="dataTable">
+                        <thead>
+                            <tr>
+                                <th>Reference ID</th>
+                                <th>Client Operation ID</th>
+                                <th>Method</th>
+                                <th>Operation State</th>
+                                <th>Status</th>
+                                <th>Initial Amount</th>
+                                <th>Initial Currency</th>
+                                <th>Charged Amount</th>
+                                <th>Charged Currency</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let globalData = [];
+        let filteredData = [];
+
+        document.getElementById('csvFile').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                processCSV(file);
+            }
+        });
+
+        function processCSV(file) {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('analytics').style.display = 'none';
+            
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const data = parseCSV(text);
+                globalData = data;
+                filteredData = data;
+                displayAnalytics(data);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('analytics').style.display = 'block';
+                document.getElementById('exportBtn').style.display = 'inline-block';
+            };
+            
+            reader.readAsText(file);
+        }
+
+        function parseCSV(text) {
+            const lines = text.split('\n');
+            const headers = lines[0].split(';');
+            const data = [];
+            
+            for (let i = 1; i < lines.length; i++) {
+                if (lines[i].trim()) {
+                    const values = lines[i].split(';');
+                    const row = {};
+                    headers.forEach((header, index) => {
+                        row[header.trim()] = values[index] ? values[index].trim() : '';
+                    });
+                    data.push(row);
+                }
+            }
+            
+            return data;
+        }
+
+        function applyFilters() {
+            const statusFilter = document.getElementById('statusFilter').value;
+            const stateFilter = document.getElementById('stateFilter').value;
+            const minAmount = parseFloat(document.getElementById('minAmount').value) || 0;
+            const maxAmount = parseFloat(document.getElementById('maxAmount').value) || Infinity;
+
+            filteredData = globalData.filter(row => {
+                const amount = parseFloat(row['Initial Amount']) || 0;
+                const statusMatch = !statusFilter || row.Status === statusFilter;
+                const stateMatch = !stateFilter || row['Operation State'] === stateFilter;
+                const amountMatch = amount >= minAmount && amount <= maxAmount;
+                
+                return statusMatch && stateMatch && amountMatch;
+            });
+
+            displayAnalytics(filteredData);
+        }
+
+        function displayAnalytics(data) {
+            // Вычисляем статистику
+            const totalOperations = data.length;
+            const successfulOperations = data.filter(row => row.Status === 'success').length;
+            const failedOperations = data.filter(row => row.Status === 'fail').length;
+            const successRate = totalOperations > 0 ? ((successfulOperations / totalOperations) * 100).toFixed(1) : 0;
+            
+            const amounts = data.map(row => parseFloat(row['Initial Amount']) || 0);
+            const totalAmount = amounts.reduce((sum, amount) => sum + amount, 0);
+            const averageAmount = totalAmount / totalOperations;
+            const maxAmountValue = Math.max(...amounts);
+            const minAmountValue = Math.min(...amounts);
+
+            // Обновляем статистику
+            document.getElementById('totalOperations').textContent = totalOperations;
+            document.getElementById('successfulOperations').textContent = successfulOperations;
+            document.getElementById('failedOperations').textContent = failedOperations;
+            document.getElementById('totalAmount').textContent = totalAmount.toLocaleString('ru-RU', {maximumFractionDigits: 2});
+            document.getElementById('averageAmount').textContent = averageAmount.toLocaleString('ru-RU', {maximumFractionDigits: 2});
+            document.getElementById('successRate').textContent = successRate + '%';
+            document.getElementById('maxAmountValue').textContent = maxAmountValue.toLocaleString('ru-RU', {maximumFractionDigits: 2});
+            document.getElementById('minAmountValue').textContent = minAmountValue.toLocaleString('ru-RU', {maximumFractionDigits: 2});
+
+            // Создаем графики
+            createStatusChart(successfulOperations, failedOperations);
+            createAmountChart(amounts);
+            createStateChart(data);
+            createTopAmountsChart(amounts);
+            createTimelineChart(data);
+            
+            // Заполняем таблицу
+            fillTable(data);
+        }
+
+        function createStatusChart(successful, failed) {
+            const ctx = document.getElementById('statusChart').getContext('2d');
+            
+            if (window.statusChart) {
+                window.statusChart.destroy();
+            }
+            
+            window.statusChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Успешные', 'Неудачные'],
+                    datasets: [{
+                        data: [successful, failed],
+                        backgroundColor: ['#28a745', '#dc3545'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function createAmountChart(amounts) {
+            const ctx = document.getElementById('amountChart').getContext('2d');
+            
+            if (window.amountChart) {
+                window.amountChart.destroy();
+            }
+
+            const ranges = {
+                '0-500': 0,
+                '501-1000': 0,
+                '1001-2000': 0,
+                '2001-5000': 0,
+                '5000+': 0
+            };
+
+            amounts.forEach(amount => {
+                if (amount <= 500) ranges['0-500']++;
+                else if (amount <= 1000) ranges['501-1000']++;
+                else if (amount <= 2000) ranges['1001-2000']++;
+                else if (amount <= 5000) ranges['2001-5000']++;
+                else ranges['5000+']++;
+            });
+
+            window.amountChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(ranges),
+                    datasets: [{
+                        label: 'Количество операций',
+                        data: Object.values(ranges),
+                        backgroundColor: 'rgba(102, 126, 234, 0.8)',
+                        borderColor: 'rgba(102, 126, 234, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        function createStateChart(data) {
+            const ctx = document.getElementById('stateChart').getContext('2d');
+            
+            if (window.stateChart) {
+                window.stateChart.destroy();
+            }
+
+            const stateCounts = {};
+            data.forEach(row => {
+                const state = row['Operation State'];
+                stateCounts[state] = (stateCounts[state] || 0) + 1;
+            });
+
+            window.stateChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(stateCounts),
+                    datasets: [{
+                        data: Object.values(stateCounts),
+                        backgroundColor: ['#ff6384', '#36a2eb', '#cc65fe', '#ffce56'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function createTopAmountsChart(amounts) {
+            const ctx = document.getElementById('topAmountsChart').getContext('2d');
+            
+            if (window.topAmountsChart) {
+                window.topAmountsChart.destroy();
+            }
+
+            const sortedAmounts = amounts.sort((a, b) => b - a).slice(0, 10);
+            const labels = sortedAmounts.map((amount, index) => `#${index + 1}`);
+
+            window.topAmountsChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Сумма (TRY)',
+                        data: sortedAmounts,
+                        borderColor: '#ff6384',
+                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                        borderWidth: 2,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        function createTimelineChart(data) {
+            const ctx = document.getElementById('timelineChart').getContext('2d');
+            
+            if (window.timelineChart) {
+                window.timelineChart.destroy();
+            }
+
+            // Группируем по первым 8 символам Reference ID (предполагаем, что это дата)
+            const timelineData = {};
+            data.forEach(row => {
+                const timeKey = row['Reference ID'].substring(0, 8);
+                if (!timelineData[timeKey]) {
+                    timelineData[timeKey] = {
+                        total: 0,
+                        success: 0,
+                        fail: 0
+                    };
+                }
+                timelineData[timeKey].total++;
+                if (row.Status === 'success') {
+                    timelineData[timeKey].success++;
+                } else {
+                    timelineData[timeKey].fail++;
+                }
+            });
+
+            const labels = Object.keys(timelineData).sort();
+            const successData = labels.map(key => timelineData[key].success);
+            const failData = labels.map(key => timelineData[key].fail);
+
+            window.timelineChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Успешные',
+                        data: successData,
+                        backgroundColor: 'rgba(40, 167, 69, 0.8)',
+                        borderColor: 'rgba(40, 167, 69, 1)',
+                        borderWidth: 1
+                    }, {
+                        label: 'Неудачные',
+                        data: failData,
+                        backgroundColor: 'rgba(220, 53, 69, 0.8)',
+                        borderColor: 'rgba(220, 53, 69, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    }
+                }
+            });
+        }
+
+        function fillTable(data) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            data.slice(0, 100).forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row['Reference ID']}</td>
+                    <td>${row['Client Operation id']}</td>
+                    <td>${row['Method']}</td>
+                    <td>${row['Operation State']}</td>
+                    <td class="${row['Status'] === 'success' ? 'success' : 'fail'}">${row['Status']}</td>
+                    <td>${parseFloat(row['Initial Amount']).toLocaleString('ru-RU')}</td>
+                    <td>${row['Initial Currency']}</td>
+                    <td>${row['Charged Amount'] ? parseFloat(row['Charged Amount']).toLocaleString('ru-RU') : '0'}</td>
+                    <td>${row['Charged Currency'] || '-'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function exportData() {
+            // Создаем CSV для экспорта
+            const headers = ['Reference ID', 'Client Operation id', 'Method', 'Operation State', 'Status', 'Initial Amount', 'Initial Currency', 'Charged Amount', 'Charged Currency'];
+            const csvContent = [headers.join(';')];
+            
+            filteredData.forEach(row => {
+                const values = headers.map(header => row[header] || '');
+                csvContent.push(values.join(';'));
+            });
+
+            const blob = new Blob([csvContent.join('\n')], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'analytics_export.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Drag and drop функциональность
+        const container = document.querySelector('.container');
+        
+        container.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            container.style.border = '2px dashed #667eea';
+        });
+
+        container.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            container.style.border = 'none';
+        });
+
+        container.addEventListener('drop', function(e) {
+            e.preventDefault();
+            container.style.border = 'none';
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].type === 'text/csv') {
+                processCSV(files[0]);
+            }
+        });
+    </script>
+</body>
+</html> 

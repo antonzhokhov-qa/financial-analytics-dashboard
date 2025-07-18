@@ -1,0 +1,236 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background: linear-gradient(135deg, #0f172a 0%, #581c87 50%, #7c3aed 100%);
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl;
+  }
+  
+  .card {
+    @apply bg-white/5 backdrop-blur-xl rounded-xl shadow-2xl border border-white/10;
+  }
+  
+  .metric-card {
+    @apply card p-6 text-center transition-all duration-500 hover:shadow-2xl hover:-translate-y-2 hover:scale-105;
+  }
+  
+  .btn-primary {
+    @apply bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 hover:from-blue-600 hover:to-purple-700 hover:shadow-lg hover:-translate-y-1 hover:scale-105;
+  }
+  
+  .btn-secondary {
+    @apply bg-white/10 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 hover:bg-white/20 hover:scale-105;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.8s ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.6s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.5s ease-out;
+  }
+
+  .animate-glow {
+    animation: glow 2s ease-in-out infinite alternate;
+  }
+
+  .hover\:scale-102:hover {
+    transform: scale(1.02);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes glow {
+  from {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+  }
+  to {
+    box-shadow: 0 0 30px rgba(139, 92, 246, 0.6);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Кастомные скроллбары */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.5);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.8);
+}
+
+/* Стили для select элементов */
+select {
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  padding-right: 40px;
+}
+
+/* Стили для input элементов */
+input[type="date"] {
+  color-scheme: dark;
+}
+
+/* Анимации для графиков */
+.chart-container {
+  transition: all 0.3s ease;
+}
+
+.chart-container:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+/* Стили для таблиц */
+.table-container {
+  @apply bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 overflow-hidden;
+}
+
+.data-table {
+  @apply w-full;
+}
+
+.data-table th {
+  @apply bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-3 text-left font-semibold;
+}
+
+.data-table td {
+  @apply px-4 py-3 border-b border-white/10 text-white;
+}
+
+.data-table tr:hover {
+  @apply bg-white/5;
+}
+
+/* Стили для метрик */
+.metric-value {
+  @apply text-3xl font-bold text-white;
+}
+
+.metric-label {
+  @apply text-sm text-gray-300 font-medium;
+}
+
+/* Стили для вкладок */
+.tab-content {
+  animation: fadeIn 0.5s ease-out;
+}
+
+/* Стили для фильтров */
+.filter-tag {
+  @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-all duration-200 hover:scale-105;
+}
+
+/* Стили для загрузки файлов */
+.upload-zone {
+  @apply border-2 border-dashed border-white/30 rounded-2xl p-8 text-center transition-all duration-300 hover:border-white/50 hover:bg-white/5;
+}
+
+.upload-zone.dragover {
+  @apply border-blue-500 bg-blue-500/10;
+}
+
+/* Стили для кнопок */
+.btn-gradient {
+  @apply bg-gradient-to-r from-blue-500 to-purple-600 text-white font-medium rounded-lg transition-all duration-300 hover:from-blue-600 hover:to-purple-700 hover:shadow-lg hover:-translate-y-1;
+}
+
+/* Стили для карточек */
+.card-hover {
+  @apply transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 hover:scale-105;
+}
+
+/* Стили для иконок */
+.icon-glow {
+  filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.5));
+}
+
+/* Стили для текста */
+.text-glow {
+  text-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+}
+
+/* Респонсивные стили */
+@media (max-width: 768px) {
+  .metric-card {
+    @apply hover:scale-100 hover:translate-y-0;
+  }
+  
+  .btn-primary {
+    @apply hover:scale-100 hover:translate-y-0;
+  }
+} 
