@@ -141,9 +141,8 @@ function detectDataFormat(headers) {
   return 'merchant'
 }
 
-export function parseCSV(text, dataType = 'merchant') {
+export function parseCSV(text, dataType = null) {
   console.log('=== CSV PARSER DEBUG ===')
-  console.log('Data type:', dataType)
   console.log('Raw text length:', text.length)
   console.log('First 500 chars:', text.substring(0, 500))
   
@@ -161,19 +160,14 @@ export function parseCSV(text, dataType = 'merchant') {
     const headerLine = lines[0].trim()
     console.log('Header line:', headerLine)
     
-    // Определяем разделитель
+    // Автоопределение разделителя
     let delimiter = ';'
-    if (dataType === 'platform') {
+    if (headerLine.includes(';')) {
+      delimiter = ';'
+    } else if (headerLine.includes(',')) {
       delimiter = ','
-    } else {
-      // Автоопределение для провайдера
-      if (headerLine.includes(';')) {
-        delimiter = ';'
-      } else if (headerLine.includes(',')) {
-        delimiter = ','
-      } else if (headerLine.includes('\t')) {
-        delimiter = '\t'
-      }
+    } else if (headerLine.includes('\t')) {
+      delimiter = '\t'
     }
     
     console.log('Using delimiter:', delimiter)
@@ -182,9 +176,13 @@ export function parseCSV(text, dataType = 'merchant') {
     const headers = headerLine.split(delimiter).map(h => h.trim().replace(/"/g, ''))
     console.log('Headers:', headers)
     
-    // Определяем формат данных
-    const format = detectDataFormat(headers)
-    console.log('Detected format:', format)
+    // Определяем формат данных автоматически
+    const detectedFormat = detectDataFormat(headers)
+    console.log('Detected format:', detectedFormat)
+    
+    // Определяем тип данных автоматически, если не передан
+    const finalDataType = dataType || detectedFormat
+    console.log('Final data type:', finalDataType)
     
     const data = []
     
@@ -206,7 +204,7 @@ export function parseCSV(text, dataType = 'merchant') {
     console.log('Parsed data count:', data.length)
     
     // Нормализуем данные
-    const normalizedData = normalizeData(data, format, dataType)
+    const normalizedData = normalizeData(data, detectedFormat, finalDataType)
     console.log('Normalized data count:', normalizedData.length)
     
     // Проверим статистику статусов

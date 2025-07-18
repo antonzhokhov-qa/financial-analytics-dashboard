@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { parseCSV } from '../utils/csvParser'
 import { calculateMetrics, generateInsights, getAmountRanges, getConversionByAmount, getStatusDistribution, getCompanyDistribution, getPaymentMethodDistribution, getTimeSeriesData, getTopUsers, detectAnomalies } from '../utils/analytics'
 import FileUpload from './FileUpload'
-import FileTypeSelector from './FileTypeSelector'
 import MetricsGrid from './MetricsGrid'
 import ChartsGrid from './ChartsGrid'
 import DataTable from './DataTable'
@@ -19,9 +18,7 @@ const Dashboard = () => {
   const [anomalies, setAnomalies] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [dataType, setDataType] = useState(null) // 'platform' или 'merchant'
-  const [showTypeSelector, setShowTypeSelector] = useState(false)
-  const [uploadedFileContent, setUploadedFileContent] = useState(null) // Сохраняем содержимое файла
+  const [dataType, setDataType] = useState(null) // Определяется автоматически
   const [filters, setFilters] = useState({
     status: '',
     company: '',
@@ -41,18 +38,8 @@ const Dashboard = () => {
         const text = e.target.result
         console.log('File content preview:', text.substring(0, 500))
         
-        // Сохраняем содержимое файла
-        setUploadedFileContent(text)
-        
-        // Если тип данных не выбран, показываем селектор
-        if (!dataType) {
-          setShowTypeSelector(true)
-          setLoading(false)
-          return
-        }
-        
-        // Парсим CSV с учетом выбранного типа
-        const parsedData = parseCSV(text, dataType)
+        // Парсим CSV с автоопределением типа
+        const parsedData = parseCSV(text)
         console.log('Parsed data:', parsedData.length, 'rows')
         
         if (parsedData.length === 0) {
@@ -61,8 +48,16 @@ const Dashboard = () => {
           return
         }
         
+        // Определяем тип данных на основе структуры данных
+        const firstRow = parsedData[0]
+        // Провайдер (merchant) имеет поля: linkId, hash, paymentMethod
+        // Платформа (platform) имеет поля: id (Reference ID), но без hash и других специфичных полей
+        const detectedType = (firstRow.hash || firstRow.linkId || firstRow.paymentMethod) ? 'merchant' : 'platform'
+        console.log('Detected data type:', detectedType)
+        
         setData(parsedData)
         setFilteredData(parsedData)
+        setDataType(detectedType)
         setLoading(false)
       } catch (err) {
         console.error('Error parsing file:', err)
@@ -79,87 +74,39 @@ const Dashboard = () => {
     reader.readAsText(file)
   }
 
-  // Обработка выбора типа данных
-  const handleDataTypeSelect = (type) => {
-    setDataType(type)
-    setShowTypeSelector(false)
-    
-    // Если файл уже загружен, перепарсим его с новым типом
-    if (uploadedFileContent) {
-      setLoading(true)
-      try {
-        const parsedData = parseCSV(uploadedFileContent, type)
-        console.log('Reparsed data with type', type, ':', parsedData.length, 'rows')
-        
-        if (parsedData.length === 0) {
-          setError('Не удалось извлечь данные из файла с выбранным типом. Попробуйте другой тип.')
-          setLoading(false)
-          return
-        }
-        
-        setData(parsedData)
-        setFilteredData(parsedData)
-        setError(null)
-        setLoading(false)
-      } catch (err) {
-        console.error('Error reparsing file:', err)
-        setError('Ошибка при обработке файла: ' + err.message)
-        setLoading(false)
-      }
-    }
-  }
-
-  // Обработка возврата к выбору типа
-  const handleBackToTypeSelector = () => {
-    setShowTypeSelector(true)
-    setDataType(null)
-  }
-
-  // Применение фильтров
-  const applyFilters = (newFilters) => {
-    setFilters(newFilters)
-    
+  // Обработка фильтрации данных
+  const handleFiltersChange = (newFilters) => {
     let filtered = [...data]
     
     // Фильтр по статусу
     if (newFilters.status) {
-      filtered = filtered.filter(row => {
-        const status = row.status ? row.status.toLowerCase() : ''
-        return status === newFilters.status.toLowerCase()
-      })
+      filtered = filtered.filter(row => row.status === newFilters.status)
     }
     
     // Фильтр по компании
     if (newFilters.company) {
-      filtered = filtered.filter(row => 
-        row.company && row.company.toLowerCase().includes(newFilters.company.toLowerCase())
-      )
+      filtered = filtered.filter(row => row.company === newFilters.company)
     }
     
     // Фильтр по методу оплаты
     if (newFilters.paymentMethod) {
-      filtered = filtered.filter(row => 
-        row.paymentMethod && row.paymentMethod.toLowerCase().includes(newFilters.paymentMethod.toLowerCase())
-      )
+      filtered = filtered.filter(row => row.paymentMethod === newFilters.paymentMethod)
     }
     
-    // Фильтр по диапазону дат
+    // Фильтр по дате
     if (newFilters.dateRange.start || newFilters.dateRange.end) {
       filtered = filtered.filter(row => {
-        if (!row.createdAt) return true
-        
         const rowDate = new Date(row.createdAt)
         const startDate = newFilters.dateRange.start ? new Date(newFilters.dateRange.start) : null
         const endDate = newFilters.dateRange.end ? new Date(newFilters.dateRange.end) : null
         
         if (startDate && rowDate < startDate) return false
         if (endDate && rowDate > endDate) return false
-        
         return true
       })
     }
     
-    // Фильтр по диапазону сумм
+    // Фильтр по сумме
     if (newFilters.amountRange.min || newFilters.amountRange.max) {
       filtered = filtered.filter(row => {
         const amount = parseFloat(row.amount) || 0
@@ -170,6 +117,7 @@ const Dashboard = () => {
       })
     }
     
+    setFilters(newFilters)
     setFilteredData(filtered)
   }
 
@@ -187,17 +135,7 @@ const Dashboard = () => {
     }
   }, [filteredData, dataType])
 
-  // Если показываем селектор типа данных
-  if (showTypeSelector) {
-    return (
-      <FileTypeSelector 
-        onTypeSelect={handleDataTypeSelect}
-        onBack={() => setShowTypeSelector(false)}
-      />
-    )
-  }
-
-  // Если данные не загружены
+  // Если данные не загружены - показываем экран загрузки
   if (data.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
@@ -211,21 +149,6 @@ const Dashboard = () => {
             <p className="text-xl text-gray-300 max-w-2xl mx-auto">
               Загрузите CSV файл для анализа финансовых операций
             </p>
-            
-            {/* Индикатор типа данных */}
-            {dataType && (
-              <div className="inline-flex items-center px-4 py-2 bg-white/10 rounded-full text-white">
-                <span className="text-sm">
-                  Источник: {dataType === 'platform' ? 'Платформа' : 'Провайдер'}
-                </span>
-                <button
-                  onClick={handleBackToTypeSelector}
-                  className="ml-2 text-blue-400 hover:text-blue-300 text-sm"
-                >
-                  Изменить
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Загрузка файла */}
@@ -262,62 +185,60 @@ const Dashboard = () => {
             
             <div className="flex items-center space-x-4">
               <button
-                onClick={handleBackToTypeSelector}
-                className="px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors duration-200"
-              >
-                Изменить источник
-              </button>
-              <button
                 onClick={() => {
                   setData([])
                   setFilteredData([])
                   setMetrics(null)
                   setDataType(null)
-                  setUploadedFileContent(null)
                   setError(null)
+                  setFilters({
+                    status: '',
+                    company: '',
+                    paymentMethod: '',
+                    dateRange: { start: '', end: '' },
+                    amountRange: { min: '', max: '' }
+                  })
                 }}
-                className="px-4 py-2 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30 transition-colors duration-200"
+                className="px-4 py-2 bg-blue-500/20 text-blue-300 rounded-lg hover:bg-blue-500/30 transition-colors duration-200"
               >
-                Новый файл
+                Загрузить новый файл
               </button>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Основной контент */}
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-        {/* Фильтры */}
-        <Filters 
-          data={data} 
-          filters={filters} 
-          onFiltersChange={applyFilters}
-          dataType={dataType}
-        />
-
         {/* Метрики */}
-        {metrics && <MetricsGrid metrics={metrics} dataType={dataType} />}
-
-        {/* Инсайты */}
-        {insights.length > 0 && <InsightsSection insights={insights} />}
-
-        {/* Графики */}
-        {filteredData.length > 0 && (
-          <ChartsGrid 
-            data={filteredData} 
-            metrics={metrics}
-            dataType={dataType}
-          />
+        {metrics && (
+          <MetricsGrid metrics={metrics} dataType={dataType} />
         )}
 
-        {/* Аномалии */}
-        {anomalies.length > 0 && <AnomalyDetection anomalies={anomalies} />}
-
-        {/* Таблица данных */}
-        {filteredData.length > 0 && (
-          <DataTable 
-            data={filteredData} 
+        {/* Фильтры */}
+        <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
+          <Filters 
+            data={data} 
+            filters={filters} 
+            onFiltersChange={handleFiltersChange} 
             dataType={dataType}
           />
+        </div>
+
+        {/* Графики */}
+        <ChartsGrid data={filteredData} metrics={metrics} dataType={dataType} />
+
+        {/* Таблица данных */}
+        <DataTable data={filteredData} dataType={dataType} />
+
+        {/* Инсайты */}
+        {insights.length > 0 && (
+          <InsightsSection insights={insights} />
+        )}
+
+        {/* Детекция аномалий */}
+        {anomalies.length > 0 && (
+          <AnomalyDetection data={filteredData} anomalies={anomalies} />
         )}
       </div>
     </div>
