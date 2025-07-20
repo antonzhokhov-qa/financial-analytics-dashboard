@@ -14,15 +14,19 @@ import EnhancedChartsGrid from './EnhancedChartsGrid'
 import PredictiveAnalytics from './PredictiveAnalytics'
 import { TrendingUp, TrendingDown, DollarSign, Users, Activity, AlertTriangle, Brain, BarChart3 } from 'lucide-react'
 
-const Dashboard = () => {
-  const [data, setData] = useState([])
-  const [filteredData, setFilteredData] = useState([])
+const Dashboard = ({ 
+  dataSource = 'csv', 
+  preloadedData = null, 
+  onBackToSelector = null 
+}) => {
+  const [data, setData] = useState(preloadedData || [])
+  const [filteredData, setFilteredData] = useState(preloadedData || [])
   const [metrics, setMetrics] = useState(null)
   const [insights, setInsights] = useState([])
   const [anomalies, setAnomalies] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [dataType, setDataType] = useState(null) // Определяется автоматически
+  const [dataType, setDataType] = useState(dataSource === 'api' ? 'platform' : null) // Определяется автоматически или по источнику
   const [timezone, setTimezone] = useState('UTC') // Добавляем поддержку часовых поясов
   const [filters, setFilters] = useState({
     status: '',
@@ -103,6 +107,16 @@ const Dashboard = () => {
     
     reader.readAsText(file)
   }
+
+  // Инициализация данных при загрузке компонента
+  useEffect(() => {
+    if (preloadedData && preloadedData.length > 0) {
+      console.log('Loading preloaded data:', preloadedData.length, 'items from', dataSource)
+      setData(preloadedData)
+      setFilteredData(preloadedData)
+      setDataType(dataSource === 'api' ? 'platform' : 'merchant')
+    }
+  }, [preloadedData, dataSource])
 
   // Обработка изменения фильтров
   const handleFiltersChange = (newFilters) => {
@@ -194,8 +208,8 @@ const Dashboard = () => {
     }
   }, [filteredData, dataType])
 
-  // Если данные не загружены - показываем экран загрузки
-  if (data.length === 0) {
+  // Если данные не загружены и это CSV режим - показываем экран загрузки
+  if (data.length === 0 && dataSource === 'csv') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
         <div className="w-full max-w-4xl space-y-8">
@@ -237,32 +251,61 @@ const Dashboard = () => {
               <div>
                 <h1 className="text-2xl font-bold text-white">Аналитика операций</h1>
                 <p className="text-gray-300">
-                  {filteredData.length} записей • Источник: {dataType === 'platform' ? 'Платформа' : 'Провайдер'}
+                  {filteredData.length} записей • Источник: {
+                    dataSource === 'api' 
+                      ? '🌐 API платформы' 
+                      : dataType === 'platform' 
+                        ? '📊 Платформа' 
+                        : '📂 Провайдер'
+                  }
                 </p>
               </div>
             </div>
             
             <div className="flex items-center space-x-4">
-              <button
-                onClick={() => {
-                  setData([])
-                  setFilteredData([])
-                  setMetrics(null)
-                  setDataType(null)
-                  setError(null)
-                  setFilters({
-                    status: '',
-                    company: '',
-                    paymentMethod: '',
-                    transactionType: '',
-                    dateRange: { start: '', end: '' },
-                    amountRange: { min: '', max: '' }
-                  })
-                }}
-                className="px-4 py-2 bg-blue-500/20 text-blue-300 rounded-lg hover:bg-blue-500/30 transition-colors duration-200"
-              >
-                Загрузить новый файл
-              </button>
+              {/* Кнопка возврата к выбору источника */}
+              {onBackToSelector && (
+                <button
+                  onClick={onBackToSelector}
+                  className="px-4 py-2 bg-purple-500/20 text-purple-300 rounded-lg hover:bg-purple-500/30 transition-colors duration-200"
+                >
+                  ← Источник данных
+                </button>
+              )}
+              
+              {/* Кнопка загрузки нового файла (только для CSV) */}
+              {dataSource === 'csv' && (
+                <button
+                  onClick={() => {
+                    setData([])
+                    setFilteredData([])
+                    setMetrics(null)
+                    setDataType(null)
+                    setError(null)
+                    setFilters({
+                      status: '',
+                      company: '',
+                      paymentMethod: '',
+                      transactionType: '',
+                      dateRange: { start: '', end: '' },
+                      amountRange: { min: '', max: '' }
+                    })
+                  }}
+                  className="px-4 py-2 bg-blue-500/20 text-blue-300 rounded-lg hover:bg-blue-500/30 transition-colors duration-200"
+                >
+                  Загрузить новый файл
+                </button>
+              )}
+              
+              {/* Кнопка обновления данных (только для API) */}
+              {dataSource === 'api' && onBackToSelector && (
+                <button
+                  onClick={onBackToSelector}
+                  className="px-4 py-2 bg-green-500/20 text-green-300 rounded-lg hover:bg-green-500/30 transition-colors duration-200"
+                >
+                  🔄 Обновить данные
+                </button>
+              )}
             </div>
           </div>
         </div>
