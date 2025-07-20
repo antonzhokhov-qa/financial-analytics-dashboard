@@ -127,22 +127,16 @@ const Filters = ({ data, filters, onFiltersChange, dataType = 'merchant' }) => {
               if (localFilters.dateRange.start || localFilters.dateRange.end) {
                 filtered = filtered.filter(row => {
                   if (!row.createdAt) return true
-                  const rowDate = new Date(row.createdAt)
-                  if (isNaN(rowDate.getTime())) return true
                   
-                  const rowDateOnly = new Date(rowDate.getFullYear(), rowDate.getMonth(), rowDate.getDate())
+                  // Получаем дату в строковом формате YYYY-MM-DD для правильного сравнения
+                  const rowDateStr = row.createdAt.split(' ')[0] // Берем только дату из "2025-07-01 12:00:12"
                   
                   if (localFilters.dateRange.start) {
-                    const startDate = new Date(localFilters.dateRange.start)
-                    if (isNaN(startDate.getTime())) return true
-                    if (rowDateOnly < startDate) return false
+                    if (rowDateStr < localFilters.dateRange.start) return false
                   }
                   
                   if (localFilters.dateRange.end) {
-                    const endDate = new Date(localFilters.dateRange.end)
-                    if (isNaN(endDate.getTime())) return true
-                    endDate.setHours(23, 59, 59, 999)
-                    if (rowDate > endDate) return false
+                    if (rowDateStr > localFilters.dateRange.end) return false
                   }
                   
                   return true

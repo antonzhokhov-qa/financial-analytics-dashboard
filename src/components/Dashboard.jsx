@@ -8,7 +8,11 @@ import DataTable from './DataTable'
 import Filters from './Filters'
 import InsightsSection from './InsightsSection'
 import AnomalyDetection from './AnomalyDetection'
-import { TrendingUp, TrendingDown, DollarSign, Users, Activity, AlertTriangle } from 'lucide-react'
+import TimezoneSelector from './TimezoneSelector'
+import TimeBasedChartsGrid from './TimeBasedChartsGrid'
+import EnhancedChartsGrid from './EnhancedChartsGrid'
+import PredictiveAnalytics from './PredictiveAnalytics'
+import { TrendingUp, TrendingDown, DollarSign, Users, Activity, AlertTriangle, Brain, BarChart3 } from 'lucide-react'
 
 const Dashboard = () => {
   const [data, setData] = useState([])
@@ -19,6 +23,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [dataType, setDataType] = useState(null) // Определяется автоматически
+  const [timezone, setTimezone] = useState('UTC') // Добавляем поддержку часовых поясов
   const [filters, setFilters] = useState({
     status: '',
     company: '',
@@ -27,6 +32,30 @@ const Dashboard = () => {
     dateRange: { start: '', end: '' },
     amountRange: { min: '', max: '' }
   })
+
+  // Функция для конвертации времени в выбранный часовой пояс
+  const convertToTimezone = (dateString, targetTimezone) => {
+    const date = new Date(dateString)
+    if (targetTimezone === 'UTC') {
+      return date
+    }
+    
+    // Простая обработка - в реальном проекте лучше использовать библиотеку типа date-fns-tz
+    const offsets = {
+      'Europe/Moscow': 3,
+      'Europe/Istanbul': 3,
+      'Europe/London': 0,
+      'Europe/Berlin': 1,
+      'Asia/Dubai': 4,
+      'Asia/Tokyo': 9,
+      'America/New_York': -5,
+      'America/Los_Angeles': -8
+    }
+    
+    const offset = offsets[targetTimezone] || 0
+    const convertedDate = new Date(date.getTime() + offset * 60 * 60 * 1000)
+    return convertedDate
+  }
 
   // Обработка загрузки файла
   const handleFileUpload = (file) => {
@@ -75,7 +104,7 @@ const Dashboard = () => {
     reader.readAsText(file)
   }
 
-  // Обработка фильтрации данных
+  // Обработка изменения фильтров
   const handleFiltersChange = (newFilters) => {
     console.log('Applying filters:', newFilters)
     let filtered = [...data]
@@ -100,10 +129,10 @@ const Dashboard = () => {
       filtered = filtered.filter(row => row.transactionType === newFilters.transactionType)
     }
     
-    // Фильтр по дате
+    // Фильтр по дате с учетом часового пояса
     if (newFilters.dateRange.start || newFilters.dateRange.end) {
       const beforeFilter = filtered.length
-      console.log('Date filter applied. Before:', beforeFilter, 'Range:', newFilters.dateRange)
+      console.log('Date filter applied. Before:', beforeFilter, 'Range:', newFilters.dateRange, 'Timezone:', timezone)
       
       filtered = filtered.filter(row => {
         if (!row.createdAt) return true // Если нет даты, не фильтруем
@@ -111,21 +140,15 @@ const Dashboard = () => {
         const rowDate = new Date(row.createdAt)
         if (isNaN(rowDate.getTime())) return true // Если дата невалидная, не фильтруем
         
-        // Получаем только дату без времени для сравнения
-        const rowDateOnly = new Date(rowDate.getFullYear(), rowDate.getMonth(), rowDate.getDate())
+        // Получаем дату в строковом формате YYYY-MM-DD для правильного сравнения
+        const rowDateStr = row.createdAt.split(' ')[0] // Берем только дату из "2025-07-01 12:00:12"
         
         if (newFilters.dateRange.start) {
-          const startDate = new Date(newFilters.dateRange.start)
-          if (isNaN(startDate.getTime())) return true
-          if (rowDateOnly < startDate) return false
+          if (rowDateStr < newFilters.dateRange.start) return false
         }
         
         if (newFilters.dateRange.end) {
-          const endDate = new Date(newFilters.dateRange.end)
-          if (isNaN(endDate.getTime())) return true
-          // Для конечной даты включаем весь день (до 23:59:59)
-          endDate.setHours(23, 59, 59, 999)
-          if (rowDate > endDate) return false
+          if (rowDateStr > newFilters.dateRange.end) return false
         }
         
         return true
@@ -148,6 +171,13 @@ const Dashboard = () => {
     console.log('Final filtered data:', filtered.length, 'out of', data.length, 'total rows')
     setFilters(newFilters)
     setFilteredData(filtered)
+  }
+
+  // Обработчик смены часового пояса
+  const handleTimezoneChange = (newTimezone) => {
+    setTimezone(newTimezone)
+    // Пересчитываем фильтры при смене часового пояса
+    handleFiltersChange(filters)
   }
 
   // Вычисление метрик при изменении данных
@@ -245,18 +275,87 @@ const Dashboard = () => {
           <MetricsGrid metrics={metrics} dataType={dataType} />
         )}
 
-        {/* Фильтры */}
+        {/* Фильтры и часовые пояса */}
         <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
-          <Filters 
-            data={data} 
-            filters={filters} 
-            onFiltersChange={handleFiltersChange} 
-            dataType={dataType}
-          />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <Filters 
+                data={data} 
+                filters={filters} 
+                onFiltersChange={handleFiltersChange} 
+                dataType={dataType}
+              />
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-blue-600 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Часовой пояс</h3>
+                  <p className="text-sm text-gray-400">Выберите часовой пояс для анализа</p>
+                </div>
+              </div>
+              <TimezoneSelector 
+                selectedTimezone={timezone}
+                onTimezoneSelect={handleTimezoneChange}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Графики */}
         <ChartsGrid data={filteredData} metrics={metrics} dataType={dataType} />
+
+        {/* Временные графики */}
+        <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
+              <Activity className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-white">Временной анализ</h3>
+              <p className="text-sm text-gray-400">
+                Активность по часам, дням недели и динамика • Часовой пояс: {timezone}
+              </p>
+            </div>
+          </div>
+          <TimeBasedChartsGrid data={filteredData} timezone={timezone} />
+        </div>
+
+        {/* Расширенная аналитика с Chart.js */}
+        <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-lg flex items-center justify-center">
+              <BarChart3 className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-white">Расширенная визуализация</h3>
+              <p className="text-sm text-gray-400">
+                Интерактивные графики с подробной аналитикой
+              </p>
+            </div>
+          </div>
+          <EnhancedChartsGrid data={filteredData} />
+        </div>
+
+        {/* Прогнозная аналитика */}
+        {metrics && (
+          <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <Brain className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">Прогнозная аналитика</h3>
+                <p className="text-sm text-gray-400">
+                  Прогнозы и рекомендации на основе данных
+                </p>
+              </div>
+            </div>
+            <PredictiveAnalytics data={filteredData} metrics={metrics} />
+          </div>
+        )}
 
         {/* Таблица данных */}
         <DataTable data={filteredData} dataType={dataType} />
