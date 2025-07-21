@@ -5,6 +5,7 @@ import FileUpload from './FileUpload'
 import MetricsGrid from './MetricsGrid'
 import ChartsGrid from './ChartsGrid'
 import DataTable from './DataTable'
+import APIDataTable from './APIDataTable'
 import Filters from './Filters'
 import InsightsSection from './InsightsSection'
 import AnomalyDetection from './AnomalyDetection'
@@ -250,15 +251,23 @@ const Dashboard = ({
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-white">Аналитика операций</h1>
-                <p className="text-gray-300">
-                  {filteredData.length} записей • Источник: {
-                    dataSource === 'api' 
-                      ? '🌐 API платформы' 
-                      : dataType === 'platform' 
-                        ? '📊 Платформа' 
-                        : '📂 Провайдер'
-                  }
-                </p>
+                <div className="flex items-center space-x-4">
+                  <p className="text-gray-300">
+                    {filteredData.length} записей из {data.length} • 
+                    {dataSource === 'api' ? (
+                      <span className="text-green-400 ml-1">🌐 API платформы</span>
+                    ) : (
+                      <span className="text-blue-400 ml-1">
+                        📂 {dataType === 'platform' ? 'Платформа' : 'Провайдер'}
+                      </span>
+                    )}
+                  </p>
+                  {dataSource === 'api' && (
+                    <span className="px-2 py-1 bg-green-500/20 text-green-300 rounded-full text-xs border border-green-500/30">
+                      Реальное время
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
             
@@ -401,7 +410,11 @@ const Dashboard = ({
         )}
 
         {/* Таблица данных */}
-        <DataTable data={filteredData} dataType={dataType} />
+        {dataSource === 'api' ? (
+          <APIDataTable data={filteredData} />
+        ) : (
+          <DataTable data={filteredData} dataType={dataType} />
+        )}
 
         {/* Инсайты */}
         {insights.length > 0 && (

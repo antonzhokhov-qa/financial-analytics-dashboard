@@ -4,7 +4,7 @@ import { Globe, Calendar, Database, Users, Download, RefreshCw } from 'lucide-re
 
 const APIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) => {
   const [filters, setFilters] = useState({
-    project: 'monetix', // По умолчанию monetix
+    project: '', // По умолчанию все проекты
     status: 'success',
     dateMode: 'latest', // latest, single, range
     date: '',
@@ -27,19 +27,18 @@ const APIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) => {
 
   // Загрузка данных
   const handleLoadData = async () => {
-    if (!filters.project) {
-      setError('Выберите проект')
-      return
-    }
-
     setLoading(true)
     setError(null)
 
     try {
       let apiFilters = {
-        project: filters.project,
         status: filters.status,
         descending: filters.descending
+      }
+
+      // Добавляем проект только если он выбран
+      if (filters.project) {
+        apiFilters.project = filters.project
       }
 
       // Настройка фильтров в зависимости от режима дат
@@ -84,6 +83,32 @@ const APIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) => {
   // Быстрые предустановки
   const quickPresets = [
     {
+      name: 'Все проекты (100 последних)',
+      action: () => {
+        setFilters({
+          ...filters,
+          project: '',
+          status: 'success',
+          dateMode: 'latest',
+          count: 100,
+          descending: true
+        })
+      }
+    },
+    {
+      name: 'Все статусы (50 последних)',
+      action: () => {
+        setFilters({
+          ...filters,
+          project: '',
+          status: '', // Все статусы
+          dateMode: 'latest',
+          count: 50,
+          descending: true
+        })
+      }
+    },
+    {
       name: 'Последние 50 Monetix',
       action: () => {
         setFilters({
@@ -97,12 +122,12 @@ const APIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) => {
       }
     },
     {
-      name: 'Сегодня Caroussel',
+      name: 'Сегодня все проекты',
       action: () => {
         const today = new Date().toISOString().split('T')[0]
         setFilters({
           ...filters,
-          project: 'caroussel',
+          project: '',
           status: 'success',
           dateMode: 'single',
           date: today
@@ -110,12 +135,13 @@ const APIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) => {
       }
     },
     {
-      name: 'Последняя неделя',
+      name: 'Последняя неделя все проекты',
       action: () => {
         const today = new Date()
         const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
         setFilters({
           ...filters,
+          project: '',
           dateMode: 'range',
           from: weekAgo.toISOString().split('T')[0],
           to: today.toISOString().split('T')[0]
