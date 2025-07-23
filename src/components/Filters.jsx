@@ -11,19 +11,42 @@ const Filters = ({ data, filters, onFiltersChange, dataType = 'merchant' }) => {
   // Получаем уникальные значения для фильтров
   const getUniqueValues = (key) => {
     const values = data.map(row => row[key]).filter(Boolean)
-    return [...new Set(values)].sort()
+    const unique = [...new Set(values)].sort()
+    console.log(`📊 Unique values for "${key}":`, unique)
+    return unique
   }
 
-  const statusOptions = dataType === 'merchant' 
-    ? [
-        { value: 'completed', label: 'Завершено' },
-        { value: 'failed', label: 'Неудачно' },
-        { value: 'canceled', label: 'Отменено' }
-      ]
-    : [
-        { value: 'success', label: 'Успешно' },
-        { value: 'fail', label: 'Ошибка' }
-      ]
+  // Формируем опции статусов из реальных данных
+  const statusOptions = (() => {
+    const statuses = getUniqueValues('status')
+    console.log('📋 Available statuses in data:', statuses)
+    
+    if (dataType === 'merchant') {
+      return statuses.map(status => {
+        const statusLower = status.toLowerCase()
+        let label = status
+        
+        // Русские названия для часто встречающихся статусов
+        if (statusLower === 'completed') label = 'Завершено'
+        else if (statusLower === 'failed') label = 'Неудачно'  
+        else if (statusLower === 'canceled') label = 'Отменено'
+        
+        return { value: status, label: label } // Используем оригинальное значение
+      })
+    } else {
+      return statuses.map(status => {
+        const statusLower = status.toLowerCase()
+        let label = status
+        
+        // Русские названия для API данных
+        if (statusLower === 'success') label = 'Успешно'
+        else if (statusLower === 'fail') label = 'Ошибка'
+        else if (statusLower === 'in_process') label = 'В процессе'
+        
+        return { value: status, label: label } // Используем оригинальное значение
+      })
+    }
+  })()
 
   const companyOptions = dataType === 'merchant' 
     ? getUniqueValues('company').map(company => ({ value: company, label: company }))
@@ -33,11 +56,27 @@ const Filters = ({ data, filters, onFiltersChange, dataType = 'merchant' }) => {
     value: method, 
     label: method 
   }))
-
-  const transactionTypeOptions = getUniqueValues('transactionType').map(type => ({ 
-    value: type, 
-    label: type === 'Deposit' ? 'Депозит' : type === 'Withdraw' ? 'Выплата' : type 
-  }))
+  
+      // Формируем опции типов транзакций из реальных данных
+    const transactionTypeOptions = (() => {
+      const types = getUniqueValues('transactionType')
+      console.log('📋 Available transaction types in data:', types)
+      
+      return types.map(type => {
+        const typeLower = type.toLowerCase()
+        let label = type
+        
+        // Русские названия для типов транзакций
+        if (typeLower === 'deposit' || typeLower === 'пополнение') label = 'Депозит'
+        else if (typeLower === 'withdraw' || typeLower === 'вывод') label = 'Выплата'
+        
+        return { value: type, label: label } // Используем оригинальное значение
+      })
+    })()
+    
+    console.log('🏢 Company options:', companyOptions)
+    console.log('💳 Payment method options:', paymentMethodOptions)
+    console.log('🔄 Transaction type options:', transactionTypeOptions)
 
   // Обновляем локальные фильтры при изменении пропсов
   useEffect(() => {

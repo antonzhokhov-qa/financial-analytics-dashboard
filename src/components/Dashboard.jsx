@@ -11,6 +11,7 @@ import InsightsSection from './InsightsSection'
 import AnomalyDetection from './AnomalyDetection'
 import TimezoneSelector from './TimezoneSelector'
 import TimeBasedChartsGrid from './TimeBasedChartsGrid'
+import BeautifulChartsGrid from './BeautifulChartsGrid'
 import EnhancedChartsGrid from './EnhancedChartsGrid'
 import PredictiveAnalytics from './PredictiveAnalytics'
 import { TrendingUp, TrendingDown, DollarSign, Users, Activity, AlertTriangle, Brain, BarChart3 } from 'lucide-react'
@@ -121,42 +122,142 @@ const Dashboard = ({
 
   // Обработка изменения фильтров
   const handleFiltersChange = (newFilters) => {
-    console.log('Applying filters:', newFilters)
+    console.log('🔍 Applying filters:', newFilters, 'Data source:', dataSource, 'Data type:', dataType)
+    console.log('📋 Sample data structure:', data.slice(0, 2).map(item => ({
+      status: item.status,
+      company: item.company,
+      paymentMethod: item.paymentMethod,
+      transactionType: item.transactionType,
+      type: item.type,
+      isDeposit: item.isDeposit,
+      isWithdraw: item.isWithdraw,
+      createdAt: item.createdAt
+    })))
+    
     let filtered = [...data]
     
-    // Фильтр по статусу
+    // Фильтр по статусу - адаптируем для разных источников
     if (newFilters.status) {
-      filtered = filtered.filter(row => row.status === newFilters.status)
+      const beforeStatusFilter = filtered.length
+      filtered = filtered.filter(row => {
+        // Для API данных - точное совпадение статуса
+        if (dataSource === 'api' || dataSource === 'enhanced-api') {
+          return row.status === newFilters.status
+        }
+        // Для CSV данных - нормализуем статусы 
+        const rowStatus = (row.status || '').toLowerCase()
+        const filterStatus = newFilters.status.toLowerCase()
+        const matches = rowStatus === filterStatus || rowStatus.includes(filterStatus)
+        
+        // Логирование первых 3 записей
+        if (filtered.indexOf(row) < 3) {
+          console.log(`🔍 Status filter debug for row ${filtered.indexOf(row)}:`, {
+            rowStatus: row.status,
+            rowStatusLower: rowStatus,
+            filterStatus: newFilters.status,
+            filterStatusLower: filterStatus,
+            matches: matches
+          })
+        }
+        
+        return matches
+      })
+      console.log(`📊 Status filter: ${beforeStatusFilter} → ${filtered.length} (filter: "${newFilters.status}")`)
     }
     
-    // Фильтр по компании
+    // Фильтр по компании - только для данных где есть company
     if (newFilters.company) {
-      filtered = filtered.filter(row => row.company === newFilters.company)
+      const beforeCompanyFilter = filtered.length
+      filtered = filtered.filter(row => {
+        const company = row.company || row.project || ''
+        const matches = company === newFilters.company
+        return matches
+      })
+      console.log(`🏢 Company filter: ${beforeCompanyFilter} → ${filtered.length} (filter: "${newFilters.company}")`)
     }
     
-    // Фильтр по методу оплаты
+    // Фильтр по методу оплаты - адаптируем для разных форматов
     if (newFilters.paymentMethod) {
-      filtered = filtered.filter(row => row.paymentMethod === newFilters.paymentMethod)
+      const beforePaymentFilter = filtered.length
+      filtered = filtered.filter(row => {
+        const method = row.paymentMethod || row.paymentMethodCode || row.paymentProduct || ''
+        const matches = method === newFilters.paymentMethod
+        return matches
+      })
+      console.log(`💳 Payment method filter: ${beforePaymentFilter} → ${filtered.length} (filter: "${newFilters.paymentMethod}")`)
     }
     
-    // Фильтр по типу транзакции
+    // Фильтр по типу транзакции - поддержка разных форматов
     if (newFilters.transactionType) {
-      filtered = filtered.filter(row => row.transactionType === newFilters.transactionType)
+      const beforeTypeFilter = filtered.length
+      filtered = filtered.filter(row => {
+        const transactionType = row.transactionType || row.type || ''
+        // Гибкое сравнение типов транзакций
+        const filterTypeLower = newFilters.transactionType.toLowerCase()
+        const transactionTypeLower = transactionType.toLowerCase()
+        
+        const matches = transactionType === newFilters.transactionType || 
+               transactionTypeLower === filterTypeLower ||
+               // Поддержка русских названий
+               (filterTypeLower === 'депозит' && (row.isDeposit || transactionTypeLower.includes('deposit') || transactionTypeLower.includes('пополнение'))) ||
+               (filterTypeLower === 'выплата' && (row.isWithdraw || transactionTypeLower.includes('withdraw') || transactionTypeLower.includes('вывод'))) ||
+               // Поддержка английских названий  
+               (filterTypeLower.includes('deposit') && (row.isDeposit || transactionTypeLower.includes('deposit') || transactionTypeLower.includes('пополнение'))) ||
+               (filterTypeLower.includes('withdraw') && (row.isWithdraw || transactionTypeLower.includes('withdraw') || transactionTypeLower.includes('вывод')))
+        
+        // Логирование первых 3 записей
+        if (filtered.indexOf(row) < 3) {
+          console.log(`🔄 Transaction type filter debug for row ${filtered.indexOf(row)}:`, {
+            transactionType: row.transactionType,
+            type: row.type,
+            filterType: newFilters.transactionType,
+            filterTypeLower: filterTypeLower,
+            transactionTypeLower: transactionTypeLower,
+            isDeposit: row.isDeposit,
+            isWithdraw: row.isWithdraw,
+            matches: matches
+          })
+        }
+        
+        return matches
+      })
+      console.log(`🔄 Transaction type filter: ${beforeTypeFilter} → ${filtered.length} (filter: "${newFilters.transactionType}")`)
     }
     
     // Фильтр по дате с учетом часового пояса
     if (newFilters.dateRange.start || newFilters.dateRange.end) {
-      const beforeFilter = filtered.length
-      console.log('Date filter applied. Before:', beforeFilter, 'Range:', newFilters.dateRange, 'Timezone:', timezone)
+      const beforeDateFilter = filtered.length
+      console.log('📅 Date filter applied. Before:', beforeDateFilter, 'Range:', newFilters.dateRange, 'Timezone:', timezone)
       
       filtered = filtered.filter(row => {
-        if (!row.createdAt) return true // Если нет даты, не фильтруем
+        if (!row.createdAt) {
+          console.log('⚠️ Row without createdAt:', row.id || 'unknown')
+          return true // Если нет даты, не фильтруем
+        }
         
         const rowDate = new Date(row.createdAt)
-        if (isNaN(rowDate.getTime())) return true // Если дата невалидная, не фильтруем
+        if (isNaN(rowDate.getTime())) {
+          console.log('⚠️ Invalid date format:', row.createdAt)
+          return true // Если дата невалидная, не фильтруем
+        }
         
         // Получаем дату в строковом формате YYYY-MM-DD для правильного сравнения
-        const rowDateStr = row.createdAt.split(' ')[0] // Берем только дату из "2025-07-01 12:00:12"
+        let rowDateStr
+        try {
+          if (row.createdAt.includes(' ')) {
+            // Формат "2025-07-01 12:00:12"
+            rowDateStr = row.createdAt.split(' ')[0]
+          } else if (row.createdAt.includes('T')) {
+            // ISO формат "2025-07-01T12:00:12.000Z"
+            rowDateStr = row.createdAt.split('T')[0]
+          } else {
+            // Предполагаем что уже в формате YYYY-MM-DD
+            rowDateStr = row.createdAt
+          }
+        } catch (e) {
+          console.log('⚠️ Error parsing date:', row.createdAt, e)
+          return true
+        }
         
         if (newFilters.dateRange.start) {
           if (rowDateStr < newFilters.dateRange.start) return false
@@ -169,7 +270,7 @@ const Dashboard = ({
         return true
       })
       
-      console.log('After date filter:', filtered.length, 'rows remaining')
+      console.log(`📅 Date filter: ${beforeDateFilter} → ${filtered.length} (range: ${newFilters.dateRange.start} - ${newFilters.dateRange.end})`)
     }
     
     // Фильтр по сумме
@@ -183,7 +284,16 @@ const Dashboard = ({
       })
     }
     
-    console.log('Final filtered data:', filtered.length, 'out of', data.length, 'total rows')
+    console.log(`🎯 Final result: ${data.length} → ${filtered.length} rows (${((filtered.length / data.length) * 100).toFixed(1)}% remaining)`)
+    console.log('📋 Applied filters summary:', {
+      status: newFilters.status || 'none',
+      company: newFilters.company || 'none', 
+      paymentMethod: newFilters.paymentMethod || 'none',
+      transactionType: newFilters.transactionType || 'none',
+      dateRange: (newFilters.dateRange.start || newFilters.dateRange.end) ? `${newFilters.dateRange.start} - ${newFilters.dateRange.end}` : 'none',
+      amountRange: (newFilters.amountRange.min || newFilters.amountRange.max) ? `${newFilters.amountRange.min} - ${newFilters.amountRange.max}` : 'none'
+    })
+    
     setFilters(newFilters)
     setFilteredData(filtered)
   }
@@ -372,7 +482,7 @@ const Dashboard = ({
               </p>
             </div>
           </div>
-          <TimeBasedChartsGrid data={filteredData} timezone={timezone} />
+                      <BeautifulChartsGrid data={filteredData} timezone={timezone} dataType={dataType} />
         </div>
 
         {/* Расширенная аналитика с Chart.js */}

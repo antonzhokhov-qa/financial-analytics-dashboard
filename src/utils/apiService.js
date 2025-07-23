@@ -250,42 +250,42 @@ export function normalizeAPIData(apiData) {
       transactionType: isPaymentIn ? 'Пополнение' : (isPaymentOut ? 'Вывод' : 'Неизвестно'),
       isDeposit: isPaymentIn,
       isWithdraw: isPaymentOut,
-      
-      // Пользователь
+    
+    // Пользователь
       userName: fullName || operation.user_id || '',
       userId: operation.user_id || '',
       fullName: fullName,
-      
-      // Время
+    
+    // Время
       createdAt: operation.operation_created_at || operation.complete_created_at || '',
       processedAt: operation.complete_modified_at || operation.operation_modified_at || '',
-      
-      // Платежная информация
+    
+    // Платежная информация
       paymentMethod: operation.payment_method_code || operation.payment_product || '',
       paymentGateway: operation.payment_product || '',
-      
-      // Техническая информация
+    
+    // Техническая информация
       hash: operation.operation_id || '',
       ipAddress: operation.ip_addr || '',
-      
-      // Дополнительные поля
+    
+    // Дополнительные поля
       linkId: operation.reference_id || '',
       clientOperationId: operation.client_operation_id || '',
-      
-      // Вычисляемые поля
+    
+    // Вычисляемые поля
       isCompleted: (operation.current_status || '').toLowerCase() === 'success',
-      isCanceled: false, // API не возвращает отмененные операции
+    isCanceled: false, // API не возвращает отмененные операции
       isFailed: (operation.current_status || '').toLowerCase() === 'fail',
       isInProcess: (operation.current_status || '').toLowerCase() === 'in_process',
-      
+    
       // Форматированные суммы
-      amountFormatted: new Intl.NumberFormat('tr-TR', { 
-        style: 'currency', 
+    amountFormatted: new Intl.NumberFormat('tr-TR', { 
+      style: 'currency', 
         currency: currency
       }).format(amount),
-      
-      feeFormatted: new Intl.NumberFormat('tr-TR', { 
-        style: 'currency', 
+    
+    feeFormatted: new Intl.NumberFormat('tr-TR', { 
+      style: 'currency', 
         currency: currency
       }).format(fee),
 
@@ -296,8 +296,8 @@ export function normalizeAPIData(apiData) {
       serviceEnv: operation.service_env || '',
       projectEnv: operation.project_env || '',
 
-      // Источник данных
-      dataSource: 'api'
+    // Источник данных
+    dataSource: 'api'
     }
   }).filter(operation => {
     // Фильтруем операции с некорректными данными
@@ -319,4 +319,54 @@ export function normalizeAPIData(apiData) {
   }
   
   return result
+} 
+
+// Сервис для работы с API сверки
+
+const RECONCILIATION_API_URL = 'http://localhost:3002/api'
+
+export async function performReconciliationAPI(merchantFile, platformFile) {
+  try {
+    console.log('📤 Sending files to reconciliation server...')
+    
+    const formData = new FormData()
+    formData.append('merchantFile', merchantFile)
+    formData.append('platformFile', platformFile)
+    
+    const response = await fetch(`${RECONCILIATION_API_URL}/reconcile`, {
+      method: 'POST',
+      body: formData
+    })
+    
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
+    }
+    
+    const result = await response.json()
+    console.log('✅ Reconciliation completed successfully:', result)
+    
+    return result
+    
+  } catch (error) {
+    console.error('❌ Reconciliation API error:', error)
+    throw error
+  }
+}
+
+export async function checkServerHealth() {
+  try {
+    const response = await fetch(`${RECONCILIATION_API_URL}/health`)
+    if (response.ok) {
+      const data = await response.json()
+      console.log('✅ Server health check passed:', data)
+      return true
+    } else {
+      console.warn('⚠️ Server health check failed:', response.status)
+      return false
+    }
+  } catch (error) {
+    console.error('❌ Server health check error:', error)
+    return false
+  }
 } 

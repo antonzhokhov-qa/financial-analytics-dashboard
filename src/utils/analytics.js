@@ -27,7 +27,13 @@ export function calculateMetrics(data, dataType = 'merchant') {
       const status = row.status ? row.status.toLowerCase() : ''
       return dataType === 'merchant' ? status === 'completed' : status === 'success'
     }).length,
-    amount: deposits.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0)
+    amount: deposits.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0),
+    successfulAmount: deposits
+      .filter(row => {
+        const status = row.status ? row.status.toLowerCase() : ''
+        return dataType === 'merchant' ? status === 'completed' : status === 'success'
+      })
+      .reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0)
   }
   
   const withdrawalMetrics = {
@@ -36,7 +42,13 @@ export function calculateMetrics(data, dataType = 'merchant') {
       const status = row.status ? row.status.toLowerCase() : ''
       return dataType === 'merchant' ? status === 'completed' : status === 'success'
     }).length,
-    amount: withdrawals.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0)
+    amount: withdrawals.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0),
+    successfulAmount: withdrawals
+      .filter(row => {
+        const status = row.status ? row.status.toLowerCase() : ''
+        return dataType === 'merchant' ? status === 'completed' : status === 'success'
+      })
+      .reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0)
   }
   
   console.log('Status breakdown:', { total, successful, failed, canceled })

@@ -14,11 +14,176 @@ function detectRecordSeparator(text) {
   return '\n' // По умолчанию
 }
 
+// Функция для определения типа транзакции из данных платформы
+function determineTransactionType(method, amount) {
+  if (!method && amount === 0) return 'unknown'
+  
+  const methodLower = (method || '').toLowerCase()
+  
+  // Проверяем по методу
+  if (methodLower.includes('deposit') || methodLower.includes('in') || methodLower.includes('пополнение')) {
+    return 'Deposit'
+  }
+  if (methodLower.includes('withdraw') || methodLower.includes('out') || methodLower.includes('вывод')) {
+    return 'Withdraw'
+  }
+  
+  // Если не определили по методу, используем сумму
+  if (amount > 0) return 'Deposit'
+  if (amount < 0) return 'Withdraw'
+  
+  return 'unknown'
+}
+
+// Функция для нормализации статусов для сверки
+function normalizeStatus(status) {
+  const statusLower = (status || '').toLowerCase()
+  
+  // Соответствия статусов: success (platform) <-> completed (merchant)
+  if (statusLower === 'success') return 'completed'
+  if (statusLower === 'failed' || statusLower === 'error') return 'failed'  
+  if (statusLower === 'pending' || statusLower === 'processing' || statusLower === 'in progress') return 'pending'
+  if (statusLower === 'cancelled' || statusLower === 'canceled') return 'canceled'
+  
+  return statusLower // Возвращаем как есть, если не нашли соответствие
+}
+
 // Функция для нормализации данных из разных форматов
 function normalizeData(data, format, dataType = 'merchant') {
-  if (dataType === 'merchant') {
-    // Нормализация для формата провайдера
+  console.log('🔄 NORMALIZING DATA - Type:', dataType, 'Records:', data.length)
+  
+  if (dataType === 'platform') {
+    // Нормализация для формата платформы
+    console.log('🏦 Normalizing platform data:', data.length, 'records')
+    
+    // Логируем первые несколько записей для анализа
+    if (data.length > 0) {
+      console.log('🔍 First platform record raw:', data[0])
+    }
     return data.map(row => ({
+      // Основные поля платформы
+      userId: row['User ID'] || '',
+      operationId: row['Operation ID'] || '',
+      status: row['Status'] || '',
+      foreignOperationId: row['Foreign Operation Id'] || '', // Ключевое поле для сверки
+      clientOperationId: row['Client Operation ID'] || '',
+      referenceId: row['Reference ID'] || '',
+      createdAt: row['Created At'] || '',
+      method: row['Method'] || '',
+      
+      // Суммы и валюты
+      initialAmount: parseFloat((row['Initial Amount'] || '0').replace(',', '.')) || 0,
+      initialCurrency: row['Initial Currency'] || 'TRY',
+      resultAmount: parseFloat((row['Result Amount'] || '0').replace(',', '.')) || 0,
+      resultCurrency: row['Result Currency'] || 'TRY',
+      
+      // Дополнительная информация
+      code: row['Code'] || '',
+      message: row['Message'] || '',
+      details: row['Details'] || '',
+      paymentChannelName: row['Payment Channel Name'] || '',
+      originalErrorMessage: row['Original Error Message'] || '',
+      endpoint: row['Endpoint'] || '',
+      
+      // Нормализованные поля для совместимости с системой
+      id: row['Foreign Operation Id'] || row['Operation ID'] || '', // Используем Foreign Operation Id как основной ID
+      trackingId: row['Foreign Operation Id'] || '', // Для сверки с провайдером
+      amount: parseFloat((row['Result Amount'] || row['Initial Amount'] || '0').replace(',', '.')) || 0,
+      currency: row['Result Currency'] || row['Initial Currency'] || 'TRY',
+      
+      // Дополнительные поля для отладки
+      debugInfo: {
+        hasForeignOpId: !!row['Foreign Operation Id'],
+        hasResultAmount: !!row['Result Amount'],
+        hasInitialAmount: !!row['Initial Amount'],
+        originalStatus: row['Status']
+      },
+      
+      // Тип операции (определяем из метода или суммы)
+      type: determineTransactionType(row['Method'], parseFloat((row['Result Amount'] || row['Initial Amount'] || '0').replace(',', '.'))),
+      transactionType: determineTransactionType(row['Method'], parseFloat((row['Result Amount'] || row['Initial Amount'] || '0').replace(',', '.'))),
+      
+      // Статус операции - нормализуем для сверки
+      normalizedStatus: normalizeStatus(row['Status'] || ''),
+      isCompleted: (row['Status'] || '').toLowerCase() === 'success',
+      isFailed: (row['Status'] || '').toLowerCase() === 'failed' || (row['Status'] || '').toLowerCase() === 'error',
+      
+      // Метаданные
+      dataSource: 'platform',
+      originalData: row // Сохраняем оригинальные данные для отладки
+    }))
+    
+    // Логируем результат нормализации платформы
+    const normalizedPlatform = data.map(row => ({
+      // Основные поля платформы
+      userId: row['User ID'] || '',
+      operationId: row['Operation ID'] || '',
+      status: row['Status'] || '',
+      foreignOperationId: row['Foreign Operation Id'] || '', // Ключевое поле для сверки
+      clientOperationId: row['Client Operation ID'] || '',
+      referenceId: row['Reference ID'] || '',
+      createdAt: row['Created At'] || '',
+      method: row['Method'] || '',
+      
+      // Суммы и валюты
+      initialAmount: parseFloat((row['Initial Amount'] || '0').replace(',', '.')) || 0,
+      initialCurrency: row['Initial Currency'] || 'TRY',
+      resultAmount: parseFloat((row['Result Amount'] || '0').replace(',', '.')) || 0,
+      resultCurrency: row['Result Currency'] || 'TRY',
+      
+      // Дополнительная информация
+      code: row['Code'] || '',
+      message: row['Message'] || '',
+      details: row['Details'] || '',
+      paymentChannelName: row['Payment Channel Name'] || '',
+      originalErrorMessage: row['Original Error Message'] || '',
+      endpoint: row['Endpoint'] || '',
+      
+      // Нормализованные поля для совместимости с системой
+      id: row['Foreign Operation Id'] || row['Operation ID'] || '', // Используем Foreign Operation Id как основной ID
+      trackingId: row['Foreign Operation Id'] || '', // Для сверки с провайдером
+      amount: parseFloat((row['Result Amount'] || row['Initial Amount'] || '0').replace(',', '.')) || 0,
+      currency: row['Result Currency'] || row['Initial Currency'] || 'TRY',
+      
+      // Дополнительные поля для отладки
+      debugInfo: {
+        hasForeignOpId: !!row['Foreign Operation Id'],
+        hasResultAmount: !!row['Result Amount'],
+        hasInitialAmount: !!row['Initial Amount'],
+        originalStatus: row['Status']
+      },
+      
+      // Тип операции (определяем из метода или суммы)
+      type: determineTransactionType(row['Method'], parseFloat((row['Result Amount'] || row['Initial Amount'] || '0').replace(',', '.'))),
+      transactionType: determineTransactionType(row['Method'], parseFloat((row['Result Amount'] || row['Initial Amount'] || '0').replace(',', '.'))),
+      
+      // Статус операции - нормализуем для сверки
+      normalizedStatus: normalizeStatus(row['Status'] || ''),
+      isCompleted: (row['Status'] || '').toLowerCase() === 'success',
+      isFailed: (row['Status'] || '').toLowerCase() === 'failed' || (row['Status'] || '').toLowerCase() === 'error',
+      
+      // Метаданные
+      dataSource: 'platform',
+      originalData: row // Сохраняем оригинальные данные для отладки
+    }))
+    
+    console.log('🏦 Platform normalization complete. Sample record:', normalizedPlatform[0])
+    console.log('🏦 Key fields for reconciliation:')
+    console.log('🏦 - foreignOperationId:', normalizedPlatform[0]?.foreignOperationId)
+    console.log('🏦 - status:', normalizedPlatform[0]?.status)
+    console.log('🏦 - normalizedStatus:', normalizedPlatform[0]?.normalizedStatus)
+    
+    return normalizedPlatform
+  } else if (dataType === 'merchant') {
+    // Нормализация для формата провайдера
+    console.log('🏪 Normalizing merchant data:', data.length, 'records')
+    
+    // Логируем первые несколько записей для анализа
+    if (data.length > 0) {
+      console.log('🔍 First merchant record raw:', data[0])
+    }
+    
+    const normalizedMerchant = data.map(row => ({
       // Основные поля
       id: row['Tracking Id'] || row['Идентификатор отслеживания'] || row['Tracking ID'] || row['ID'] || '',
       status: row['Status'] || row['Статус'] || '',
@@ -72,77 +237,94 @@ function normalizeData(data, format, dataType = 'merchant') {
       feeFormatted: new Intl.NumberFormat('tr-TR', { 
         style: 'currency', 
         currency: 'TRY' 
-      }).format(parseFloat((row['Fee'] || row['Комиссия'] || '0').replace(',', '.')) || 0)
+      }).format(parseFloat((row['Fee'] || row['Комиссия'] || '0').replace(',', '.')) || 0),
+      
+      // Дополнительные поля для сверки
+      trackingId: row['Tracking Id'] || row['Идентификатор отслеживания'] || row['Tracking ID'] || row['ID'] || '',
+      normalizedStatus: (row['Status'] || row['Статус'] || '').toLowerCase(),
+      dataSource: 'merchant',
+      originalData: row
     }))
+    
+    console.log('🏪 Merchant normalization complete. Sample record:', normalizedMerchant[0])
+    console.log('🏪 Key fields for reconciliation:')
+    console.log('🏪 - trackingId:', normalizedMerchant[0]?.trackingId)
+    console.log('🏪 - status:', normalizedMerchant[0]?.status)
+    console.log('🏪 - normalizedStatus:', normalizedMerchant[0]?.normalizedStatus)
+    
+    return normalizedMerchant
   } else {
-    // Нормализация для формата платформы
-    return data.map(row => ({
-      id: row['Reference ID'] || row['ID'] || row['ID операции'] || '',
-      status: row['Status'] || row['Статус'] || '',
-      amount: parseFloat((row['Initial Amount'] || row['Amount'] || row['Сумма'] || '0').replace(',', '.')) || 0,
-      type: row['Type'] || row['Operation Type'] || row['Тип операции'] || '',
-      company: row['Company'] || row['Компания'] || '',
-      fee: parseFloat((row['Fee'] || row['Комиссия'] || '0').replace(',', '.')) || 0,
-      feeRatio: row['Fee Ratio'] || '0%',
-      
-      userName: row['Username'] || row['User Name'] || row['Пользователь'] || '',
-      userId: row['User ID'] || row['ID пользователя'] || '',
-      fullName: row['Full Name'] || row['Name'] || row['Имя'] || '',
-      
-      createdAt: row['Created At'] || row['Creation Date'] || row['Дата создания'] || '',
-      processedAt: row['Processed At'] || row['Processing Date'] || row['Дата обработки'] || '',
-      
-      paymentMethod: row['Method'] || row['Payment Method'] || row['Способ оплаты'] || '',
-      paymentGateway: row['Payment Gateway'] || '',
-      recipientName: row['Recipient Name'] || row['Имя получателя'] || '',
-      recipientAccount: row['Recipient Account'] || row['Счет получателя'] || '',
-      
-      hash: row['Hash'] || row['Хэш'] || '',
-      ipAddress: row['IP Address'] || row['IP адрес'] || '',
-      receipt: row['Receipt'] || row['Квитанция'] || '',
-      explanation: row['Explanation'] || row['Объяснение'] || '',
-      explanationType: row['Explanation Type'] || row['Тип объяснения'] || '',
-      
-      linkId: row['Link ID'] || row['ID ссылки'] || '',
-      
-      isCompleted: (row['Status'] || row['Статус'] || '').toLowerCase() === 'success',
-      isCanceled: false, // Платформа не имеет отмененных статусов
-      isFailed: (row['Status'] || row['Статус'] || '').toLowerCase() === 'fail',
-      
-      // Форматированные суммы (в TRY для всех типов)
-      amountFormatted: new Intl.NumberFormat('tr-TR', { 
-        style: 'currency', 
-        currency: 'TRY' 
-      }).format(parseFloat((row['Initial Amount'] || row['Amount'] || row['Сумма'] || '0').replace(',', '.')) || 0),
-      
-      feeFormatted: new Intl.NumberFormat('tr-TR', { 
-        style: 'currency', 
-        currency: 'TRY' 
-      }).format(parseFloat((row['Fee'] || row['Комиссия'] || '0').replace(',', '.')) || 0)
-    }))
+    // Fallback для неизвестного типа данных
+    console.log('⚠️ Unknown data type, using fallback normalization')
+    return data
   }
 }
 
 // Функция для определения формата данных
 function detectDataFormat(headers) {
   const headerStr = headers.join(' ').toLowerCase()
+  console.log('🔍 Detecting data format from headers:', headerStr)
   
-  // Проверяем наличие русских заголовков (формат провайдера)
-  if (headerStr.includes('идентификатор') || headerStr.includes('статус') || headerStr.includes('сумма')) {
-    return 'merchant'
-  }
+  // Точные заголовки платформы
+  const platformHeaders = [
+    'user id', 'operation id', 'status', 'foreign operation id', 
+    'client operation id', 'reference id', 'created at', 'method',
+    'initial amount', 'initial currency', 'result amount', 'result currency',
+    'code', 'message', 'details', 'payment channel name', 
+    'original error message', 'endpoint'
+  ]
   
-  // Проверяем наличие английских заголовков (формат провайдера)
-  if (headerStr.includes('tracking id') || headerStr.includes('status') || headerStr.includes('amount') || headerStr.includes('payment method')) {
-    return 'merchant'
-  }
+  // Точные заголовки провайдера
+  const merchantHeaders = [
+    'tracking id', 'reference id', 'status', 'payment method', 'payment gateway',
+    'amount', 'transaction amount', 'type', 'company', 'fee', 'fee ratio',
+    'name', 'user ıd', 'user name', 'creation time', 'processed time',
+    'receiver account name', 'receiver account number', 'hash code',
+    'client ip address', 'receipt', 'explanation', '[explanation type]'
+  ]
   
-  // Проверяем наличие английских заголовков (формат платформы)
-  if (headerStr.includes('reference id') || headerStr.includes('initial amount') || headerStr.includes('method')) {
+  // Проверяем точное соответствие заголовкам платформы
+  const platformMatchCount = platformHeaders.filter(header => 
+    headerStr.includes(header)
+  ).length
+  
+  // Проверяем точное соответствие заголовкам провайдера
+  const merchantMatchCount = merchantHeaders.filter(header => 
+    headerStr.includes(header)
+  ).length
+  
+  console.log('📊 Platform header matches:', platformMatchCount, '/', platformHeaders.length)
+  console.log('📊 Merchant header matches:', merchantMatchCount, '/', merchantHeaders.length)
+  
+  // Если больше совпадений с платформой
+  if (platformMatchCount > merchantMatchCount && platformMatchCount >= 10) {
+    console.log('📊 Detected: Platform format (exact match)')
     return 'platform'
   }
   
-  // По умолчанию считаем форматом провайдера
+  // Если больше совпадений с провайдером
+  if (merchantMatchCount > platformMatchCount && merchantMatchCount >= 10) {
+    console.log('📊 Detected: Merchant format (exact match)')
+    return 'merchant'
+  }
+  
+  // Fallback на старую логику
+  if (headerStr.includes('foreign operation id') || 
+      headerStr.includes('client operation id') || 
+      headerStr.includes('initial amount') || 
+      headerStr.includes('result amount')) {
+    console.log('📊 Detected: Platform format (fallback)')
+    return 'platform'
+  }
+  
+  if (headerStr.includes('tracking id') || 
+      (headerStr.includes('status') && headerStr.includes('amount'))) {
+    console.log('📊 Detected: Merchant format (fallback)')
+    return 'merchant'
+  }
+  
+  // По умолчанию считаем провайдером
+  console.log('📊 Default: Merchant format')
   return 'merchant'
 }
 
@@ -150,6 +332,7 @@ export function parseCSV(text, dataType = null) {
   console.log('=== CSV PARSER DEBUG ===')
   console.log('Raw text length:', text.length)
   console.log('First 500 chars:', text.substring(0, 500))
+  console.log('Last 500 chars:', text.substring(text.length - 500))
   
   try {
     // Разделяем на строки
@@ -164,6 +347,7 @@ export function parseCSV(text, dataType = null) {
     // Первая строка - заголовки
     const headerLine = lines[0].trim()
     console.log('Header line:', headerLine)
+    console.log('Header line length:', headerLine.length)
     
     // Автоопределение разделителя
     let delimiter = ';'
@@ -179,31 +363,196 @@ export function parseCSV(text, dataType = null) {
     
     // Парсим заголовки
     const headers = headerLine.split(delimiter).map(h => h.trim().replace(/"/g, ''))
+    console.log('Headers count:', headers.length)
     console.log('Headers:', headers)
+    
+    // Детальный анализ заголовков для сверки
+    console.log('🔍 HEADER ANALYSIS FOR RECONCILIATION:')
+    console.log('🔍 All headers (lowercase):', headers.map(h => h.toLowerCase()))
+    
+    // Ищем ключевые поля для сверки
+    const statusFields = headers.filter(h => h.toLowerCase().includes('status'))
+    const idFields = headers.filter(h => h.toLowerCase().includes('id') || h.toLowerCase().includes('tracking'))
+    const amountFields = headers.filter(h => h.toLowerCase().includes('amount'))
+    
+    console.log('🔍 Status fields found:', statusFields)
+    console.log('🔍 ID fields found:', idFields)
+    console.log('🔍 Amount fields found:', amountFields)
     
     // Определяем формат данных автоматически
     const detectedFormat = detectDataFormat(headers)
     console.log('Detected format:', detectedFormat)
     
     // Определяем тип данных автоматически, если не передан
-    const finalDataType = dataType || detectedFormat
+    let finalDataType = dataType || detectedFormat
+    
+    // Специальная проверка для файла платформы с одной строкой данных
+    if (lines.length === 2 && !dataType) {
+      console.log('🔍 Detected file with only 2 lines, checking for platform format...')
+      const headerStr = headers.join(' ').toLowerCase()
+      
+      // Проверяем наличие ключевых заголовков платформы
+      const platformKeywords = ['foreign operation id', 'client operation id', 'initial amount', 'result amount']
+      const platformMatches = platformKeywords.filter(keyword => headerStr.includes(keyword)).length
+      
+      if (platformMatches >= 2) {
+        console.log('🔍 Platform keywords found, forcing platform format')
+        finalDataType = 'platform'
+      }
+    }
+    
     console.log('Final data type:', finalDataType)
     
     const data = []
     
-    // Парсим данные
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim()
-      if (!line) continue
+    // Специальная обработка для файла платформы с неправильной структурой
+    if (finalDataType === 'platform' && lines.length === 2) {
+      console.log('🔧 Detected platform file with single data line, processing specially...')
       
-      const values = line.split(delimiter).map(v => v.trim().replace(/"/g, ''))
+      // Проверяем, не смешались ли заголовки с данными
+      if (headers.length > 50) {
+        console.log('⚠️ Too many headers detected, likely mixed with data. Attempting to fix...')
+        
+        // Ищем правильные заголовки в начале строки
+        const expectedPlatformHeaders = [
+          'User ID', 'Operation ID', 'Status', 'Foreign Operation Id', 'Client Operation ID', 
+          'Reference ID', 'Created At', 'Method', 'Initial Amount', 'Initial Currency', 
+          'Result Amount', 'Result Currency', 'Code', 'Message', 'Details', 
+          'Payment Channel Name', 'Original Error Message', 'Endpoint'
+        ]
+        
+        // Берем вторую строку (данные)
+        const dataLine = lines[1].trim()
+        console.log('Data line length:', dataLine.length)
+        
+        // Разбиваем по разделителю
+        const allValues = dataLine.split(delimiter).map(v => v.trim().replace(/"/g, ''))
+        console.log('Total values found:', allValues.length)
+        
+        // Используем правильные заголовки
+        const correctHeaders = expectedPlatformHeaders
+        console.log('Using correct headers count:', correctHeaders.length)
+        
+        // Проверяем, что количество значений кратно количеству заголовков
+        const valuesPerRecord = correctHeaders.length
+        const recordCount = Math.floor(allValues.length / valuesPerRecord)
+        
+        console.log('Values per record:', valuesPerRecord)
+        console.log('Calculated record count:', recordCount)
+        
+        // Проверяем остаток
+        const remainder = allValues.length % valuesPerRecord
+        if (remainder > 0) {
+          console.warn('⚠️ Warning: Values count is not perfectly divisible by headers count. Remainder:', remainder)
+        }
+        
+        // Создаем записи
+        for (let i = 0; i < recordCount; i++) {
+          const row = {}
+          const startIndex = i * valuesPerRecord
+          
+          correctHeaders.forEach((header, headerIndex) => {
+            const valueIndex = startIndex + headerIndex
+            if (valueIndex < allValues.length) {
+              row[header] = allValues[valueIndex] || ''
+            } else {
+              row[header] = ''
+              console.warn('⚠️ Value index out of bounds:', valueIndex, 'for header:', header)
+            }
+          })
+          
+          data.push(row)
+        }
+        
+        console.log('Created records from single line:', data.length)
+        
+        // Показываем первые несколько записей для проверки
+        if (data.length > 0) {
+          console.log('First record sample:', data[0])
+          if (data.length > 1) {
+            console.log('Second record sample:', data[1])
+          }
+        }
+      } else {
+        // Стандартная обработка для нормального количества заголовков
+        const dataLine = lines[1].trim()
+        console.log('Data line length:', dataLine.length)
+        
+        const allValues = dataLine.split(delimiter).map(v => v.trim().replace(/"/g, ''))
+        console.log('Total values found:', allValues.length)
+        console.log('Expected headers count:', headers.length)
+        
+        const valuesPerRecord = headers.length
+        const recordCount = Math.floor(allValues.length / valuesPerRecord)
+        
+        console.log('Values per record:', valuesPerRecord)
+        console.log('Calculated record count:', recordCount)
+        
+        const remainder = allValues.length % valuesPerRecord
+        if (remainder > 0) {
+          console.warn('⚠️ Warning: Values count is not perfectly divisible by headers count. Remainder:', remainder)
+        }
+        
+        for (let i = 0; i < recordCount; i++) {
+          const row = {}
+          const startIndex = i * valuesPerRecord
+          
+          headers.forEach((header, headerIndex) => {
+            const valueIndex = startIndex + headerIndex
+            if (valueIndex < allValues.length) {
+              row[header] = allValues[valueIndex] || ''
+            } else {
+              row[header] = ''
+              console.warn('⚠️ Value index out of bounds:', valueIndex, 'for header:', header)
+            }
+          })
+          
+          data.push(row)
+        }
+        
+        console.log('Created records from single line:', data.length)
+        
+        if (data.length > 0) {
+          console.log('First record sample:', data[0])
+          if (data.length > 1) {
+            console.log('Second record sample:', data[1])
+          }
+        }
+      }
+    } else if (finalDataType === 'platform' && lines.length > 2) {
+      // Альтернативная обработка для файла платформы с нормальной структурой
+      console.log('🔧 Processing platform file with normal structure...')
       
-      const row = {}
-      headers.forEach((header, index) => {
-        row[header] = values[index] || ''
-      })
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim()
+        if (!line) continue
+        
+        const values = line.split(delimiter).map(v => v.trim().replace(/"/g, ''))
+        
+        const row = {}
+        headers.forEach((header, index) => {
+          row[header] = values[index] || ''
+        })
+        
+        data.push(row)
+      }
       
-      data.push(row)
+      console.log('Processed platform records:', data.length)
+    } else {
+      // Стандартная обработка для нормальных CSV файлов
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim()
+        if (!line) continue
+        
+        const values = line.split(delimiter).map(v => v.trim().replace(/"/g, ''))
+        
+        const row = {}
+        headers.forEach((header, index) => {
+          row[header] = values[index] || ''
+        })
+        
+        data.push(row)
+      }
     }
     
     console.log('Parsed data count:', data.length)

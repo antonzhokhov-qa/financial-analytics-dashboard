@@ -108,6 +108,16 @@ const MetricsGrid = ({ metrics, dataType = 'merchant' }) => {
       borderColor: 'border-green-500/30'
     },
     {
+      title: 'Сумма успешных депозитов',
+      value: formatCurrency(metrics.depositMetrics.successfulAmount || 0),
+      subtitle: `${metrics.depositMetrics.successful || 0} операций`,
+      icon: DollarSign,
+      color: 'from-green-500 to-emerald-500',
+      bgColor: 'bg-green-500/20',
+      borderColor: 'border-green-500/30',
+      hidden: !metrics.depositMetrics || metrics.depositMetrics.total === 0
+    },
+    {
       title: 'Выплаты',
       value: metrics.withdrawalMetrics.total.toLocaleString('tr-TR'),
       subtitle: `${formatCurrency(metrics.withdrawalMetrics.amount)} • ${metrics.withdrawalMetrics.successful} успешных`,
@@ -115,6 +125,16 @@ const MetricsGrid = ({ metrics, dataType = 'merchant' }) => {
       color: 'from-orange-500 to-red-500',
       bgColor: 'bg-orange-500/20',
       borderColor: 'border-orange-500/30'
+    },
+    {
+      title: 'Сумма успешных выплат',
+      value: formatCurrency(metrics.withdrawalMetrics.successfulAmount || 0),
+      subtitle: `${metrics.withdrawalMetrics.successful || 0} операций`,
+      icon: DollarSign,
+      color: 'from-green-500 to-emerald-500',
+      bgColor: 'bg-green-500/20',
+      borderColor: 'border-green-500/30',
+      hidden: !metrics.withdrawalMetrics || metrics.withdrawalMetrics.total === 0
     },
     {
       title: 'Максимальная сумма',

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Upload, Globe, Database, FileText } from 'lucide-react'
 
-const DataSourceSelector = ({ onSourceChange, currentSource }) => {
+const DataSourceSelector = ({ onSourceChange, currentSource, onReconciliationClick }) => {
   const [selectedSource, setSelectedSource] = useState(currentSource || 'csv')
 
   const sources = [
@@ -30,6 +30,21 @@ const DataSourceSelector = ({ onSourceChange, currentSource }) => {
         'Реальное время',
         'Данные платформы'
       ]
+    },
+    {
+      id: 'enhanced-api',
+      title: 'Расширенный API 🚀',
+      description: 'Новые возможности коллектора: криптовалюты, информация о картах',
+      icon: Database,
+      color: 'from-purple-500 to-pink-600',
+      features: [
+        '💰 Поддержка криптовалют',
+        '💳 Детальная информация о картах',
+        '💱 Валютные курсы',
+        '🛡️ 3D Secure данные',
+        '🌍 IP геолокация'
+      ],
+      isNew: true
     }
   ]
 
@@ -140,7 +155,7 @@ const DataSourceSelector = ({ onSourceChange, currentSource }) => {
             <h3 className="text-lg font-semibold text-white">Сравнение источников</h3>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
             <div>
               <h4 className="font-semibold text-white mb-2">📂 CSV файлы (провайдер)</h4>
               <ul className="space-y-1 text-gray-300">
@@ -160,6 +175,32 @@ const DataSourceSelector = ({ onSourceChange, currentSource }) => {
                 <li>• Фильтрация по датам и проектам</li>
               </ul>
             </div>
+
+            <div>
+              <h4 className="font-semibold text-white mb-2">🚀 Расширенный API <span className="text-xs bg-purple-500/30 px-2 py-1 rounded-full">НОВОЕ</span></h4>
+              <ul className="space-y-1 text-gray-300">
+                <li>• Поддержка криптовалют (fiat/crypto)</li>
+                <li>• Информация о картах и 3D Secure</li>
+                <li>• Валютные курсы и MCC коды</li>
+                <li>• IP адреса и геолокация</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* Специальная опция - Сверка данных */}
+        <div className="text-center">
+          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6">
+            <h3 className="text-xl font-bold text-white mb-3">🔄 Сверка данных</h3>
+            <p className="text-gray-300 mb-4">
+              Сравните данные от провайдера и платформы для выявления расхождений
+            </p>
+            <button
+              onClick={onReconciliationClick}
+              className="px-6 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white font-semibold rounded-lg shadow-lg hover:from-orange-600 hover:to-red-700 transition-all duration-200"
+            >
+              Запустить сверку
+            </button>
           </div>
         </div>
 
@@ -170,7 +211,11 @@ const DataSourceSelector = ({ onSourceChange, currentSource }) => {
               onClick={() => onSourceChange(selectedSource)}
               className="px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold rounded-xl shadow-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200 text-lg"
             >
-              Продолжить с {selectedSource === 'csv' ? 'CSV файлами' : 'API платформы'}
+              Продолжить с {
+                selectedSource === 'csv' ? 'CSV файлами' : 
+                selectedSource === 'enhanced-api' ? 'Расширенным API' : 
+                'API платформы'
+              }
             </button>
           </div>
         )}
