@@ -9,14 +9,6 @@
       }
     }
   ],
-  "functions": {
-    "api/health.js": {
-      "maxDuration": 10
-    },
-    "api/reconcile.js": {
-      "maxDuration": 60
-    }
-  },
   "routes": [
     {
       "src": "/api/health",
