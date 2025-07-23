@@ -332,13 +332,22 @@ export async function performReconciliationAPI(merchantFile, platformFile) {
     console.log('📤 Sending files to reconciliation server...')
     console.log('🔗 API URL:', RECONCILIATION_API_URL)
     
-    const formData = new FormData()
-    formData.append('merchantFile', merchantFile)
-    formData.append('platformFile', platformFile)
+    // Читаем файлы как base64
+    const merchantBuffer = await merchantFile.arrayBuffer()
+    const platformBuffer = await platformFile.arrayBuffer()
+    
+    const merchantBase64 = btoa(String.fromCharCode(...new Uint8Array(merchantBuffer)))
+    const platformBase64 = btoa(String.fromCharCode(...new Uint8Array(platformBuffer)))
     
     const response = await fetch(`${RECONCILIATION_API_URL}/reconcile`, {
       method: 'POST',
-      body: formData
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        merchantFile: merchantBase64,
+        platformFile: platformBase64
+      })
     })
     
     if (!response.ok) {
