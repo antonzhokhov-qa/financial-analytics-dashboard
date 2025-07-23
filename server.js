@@ -13,7 +13,12 @@ const app = express()
 const port = 3002
 
 // Middleware
-app.use(cors())
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://financial-analytics-dashboard.vercel.app', 'https://*.vercel.app']
+    : ['http://localhost:3000', 'http://localhost:5173'],
+  credentials: true
+}))
 app.use(express.json())
 
 // Настройка multer для загрузки файлов

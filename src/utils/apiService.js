@@ -323,13 +323,14 @@ export function normalizeAPIData(apiData) {
 
 // Сервис для работы с API сверки
 
-const RECONCILIATION_API_URL = process.env.NODE_ENV === 'production' 
+const RECONCILIATION_API_URL = import.meta.env.PROD 
   ? '/api' 
   : 'http://localhost:3002/api'
 
 export async function performReconciliationAPI(merchantFile, platformFile) {
   try {
     console.log('📤 Sending files to reconciliation server...')
+    console.log('🔗 API URL:', RECONCILIATION_API_URL)
     
     const formData = new FormData()
     formData.append('merchantFile', merchantFile)
