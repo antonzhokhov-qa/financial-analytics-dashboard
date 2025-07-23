@@ -323,7 +323,9 @@ export function normalizeAPIData(apiData) {
 
 // Сервис для работы с API сверки
 
-const RECONCILIATION_API_URL = 'http://localhost:3002/api'
+const RECONCILIATION_API_URL = process.env.NODE_ENV === 'production' 
+  ? '/api' 
+  : 'http://localhost:3002/api'
 
 export async function performReconciliationAPI(merchantFile, platformFile) {
   try {

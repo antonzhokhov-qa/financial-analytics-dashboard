@@ -426,8 +426,14 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() })
 })
 
-app.listen(port, () => {
-  console.log(`🚀 Reconciliation server running on port ${port}`)
-  console.log(`📊 Health check: http://localhost:${port}/api/health`)
-  console.log(`🔄 Reconciliation endpoint: http://localhost:${port}/api/reconcile`)
-}) 
+// Для Vercel используем экспорт приложения
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(port, () => {
+    console.log(`🚀 Reconciliation server running on port ${port}`)
+    console.log(`📊 Health check: http://localhost:${port}/api/health`)
+    console.log(`🔄 Reconciliation endpoint: http://localhost:${port}/api/reconcile`)
+  })
+}
+
+// Экспортируем для Vercel
+export default app 
