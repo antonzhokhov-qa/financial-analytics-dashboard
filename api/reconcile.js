@@ -1,12 +1,12 @@
 import csv from 'csv-parser'
 import fs from 'fs'
+import { Readable } from 'stream'
 
 // Функция для парсинга CSV из буфера
 function parseCSVBuffer(buffer) {
   return new Promise((resolve, reject) => {
     const results = []
-    const stream = require('stream')
-    const readable = new stream.Readable()
+    const readable = new Readable()
     readable.push(buffer)
     readable.push(null)
     
