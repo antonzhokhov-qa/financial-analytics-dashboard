@@ -347,14 +347,11 @@ export async function performReconciliationAPI(merchantFile, platformFile) {
       throw new Error(`Файл слишком большой. Максимальный размер: 50MB. Merchant: ${(merchantFile.size / 1024 / 1024).toFixed(2)}MB, Platform: ${(platformFile.size / 1024 / 1024).toFixed(2)}MB`)
     }
     
-    // Читаем файлы как base64
-    const merchantBuffer = await merchantFile.arrayBuffer()
-    const platformBuffer = await platformFile.arrayBuffer()
-    
+    // Читаем файлы как base64 более эффективным способом
     console.log('📄 Converting files to base64...')
     
-    const merchantBase64 = btoa(String.fromCharCode(...new Uint8Array(merchantBuffer)))
-    const platformBase64 = btoa(String.fromCharCode(...new Uint8Array(platformBuffer)))
+    const merchantBase64 = await fileToBase64(merchantFile)
+    const platformBase64 = await fileToBase64(platformFile)
     
     console.log('📤 Sending request to server...')
     
@@ -383,6 +380,20 @@ export async function performReconciliationAPI(merchantFile, platformFile) {
     console.error('❌ Reconciliation API error:', error)
     throw error
   }
+}
+
+// Функция для безопасной конвертации файла в base64
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      // Убираем префикс "data:application/octet-stream;base64," из результата
+      const base64 = reader.result.split(',')[1]
+      resolve(base64)
+    }
+    reader.onerror = () => reject(new Error('Ошибка чтения файла'))
+    reader.readAsDataURL(file)
+  })
 }
 
 export async function checkServerHealth() {
