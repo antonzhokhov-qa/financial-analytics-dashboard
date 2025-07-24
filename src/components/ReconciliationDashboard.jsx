@@ -22,14 +22,18 @@ function formatReconciliationForTable(reconciliationResults) {
   })
 
   // Сначала добавляем записи только у провайдера (приоритет 1 - самые проблемные)
-  merchantOnly.forEach(merchant => {
+  merchantOnly.forEach(record => {
     allRecords.push({
-      id: merchant.id,
-      merchantId: merchant.id,
+      id: record.merchant?.trackingId || record.trackingId || 'N/A',
+      merchantId: record.merchant?.trackingId || record.trackingId || 'N/A',
       platformId: null,
-      merchantStatus: merchant.merchantStatus,
+      merchantStatus: record.merchant?.status || record.status || 'N/A',
       platformStatus: null,
-      merchantData: { status: merchant.merchantStatus, id: merchant.id },
+      merchantData: { 
+        status: record.merchant?.status || record.status || 'N/A', 
+        id: record.merchant?.trackingId || record.trackingId || 'N/A',
+        amount: record.merchant?.amount || record.amount || 'N/A'
+      },
       platformData: null,
       reconciliationStatus: 'merchant_only',
       matchType: 'no_match',
@@ -39,15 +43,19 @@ function formatReconciliationForTable(reconciliationResults) {
   })
 
   // Затем записи только на платформе (приоритет 2)
-  platformOnly.forEach(platform => {
+  platformOnly.forEach(record => {
     allRecords.push({
-      id: platform.id,
+      id: record.platform?.foreignOperationId || record.foreignOperationId || 'N/A',
       merchantId: null,
-      platformId: platform.id,
+      platformId: record.platform?.foreignOperationId || record.foreignOperationId || 'N/A',
       merchantStatus: null,
-      platformStatus: platform.platformStatus,
+      platformStatus: record.platform?.status || record.status || 'N/A',
       merchantData: null,
-      platformData: { status: platform.platformStatus, id: platform.id },
+      platformData: { 
+        status: record.platform?.status || record.status || 'N/A', 
+        id: record.platform?.foreignOperationId || record.foreignOperationId || 'N/A',
+        amount: record.platform?.amount || record.amount || 'N/A'
+      },
       reconciliationStatus: 'platform_only',
       matchType: 'no_match',
       hasIssue: true,
@@ -56,51 +64,57 @@ function formatReconciliationForTable(reconciliationResults) {
   })
 
   // Затем записи с расхождениями по статусу или сумме (приоритет 3)
-  statusMismatch.forEach(mismatch => {
+  statusMismatch.forEach(record => {
+    const merchantId = record.merchant?.trackingId || record.trackingId || 'N/A'
+    const platformId = record.platform?.foreignOperationId || record.foreignOperationId || 'N/A'
+    
     allRecords.push({
-      id: mismatch.id,
-      merchantId: mismatch.id,
-      platformId: mismatch.id,
-      merchantStatus: mismatch.merchantStatus,
-      platformStatus: mismatch.platformStatus,
-      merchantAmount: mismatch.merchantAmount,
-      platformAmount: mismatch.platformAmount,
+      id: merchantId,
+      merchantId: merchantId,
+      platformId: platformId,
+      merchantStatus: record.merchant?.status || record.status || 'N/A',
+      platformStatus: record.platform?.status || record.status || 'N/A',
+      merchantAmount: record.merchant?.amount || record.amount || 'N/A',
+      platformAmount: record.platform?.amount || record.amount || 'N/A',
       merchantData: { 
-        status: mismatch.merchantStatus, 
-        id: mismatch.id,
-        amount: mismatch.merchantAmount 
+        status: record.merchant?.status || record.status || 'N/A', 
+        id: merchantId,
+        amount: record.merchant?.amount || record.amount || 'N/A'
       },
       platformData: { 
-        status: mismatch.platformStatus, 
-        id: mismatch.id,
-        amount: mismatch.platformAmount 
+        status: record.platform?.status || record.status || 'N/A', 
+        id: platformId,
+        amount: record.platform?.amount || record.amount || 'N/A'
       },
-      reconciliationStatus: mismatch.reconciliationStatus || 'status_mismatch',
-      matchType: mismatch.issueType || 'status_mismatch',
+      reconciliationStatus: record.reconciliationStatus || 'status_mismatch',
+      matchType: record.matchType || 'status_mismatch',
       hasIssue: true,
-      issueType: mismatch.issueType || 'status'
+      issueType: record.issueType || 'status'
     })
   })
 
   // В конце добавляем совпадающие записи (приоритет 4 - самые хорошие)
-  matched.forEach(match => {
+  matched.forEach(record => {
+    const merchantId = record.merchant?.trackingId || record.trackingId || 'N/A'
+    const platformId = record.platform?.foreignOperationId || record.foreignOperationId || 'N/A'
+    
     allRecords.push({
-      id: match.id,
-      merchantId: match.id,
-      platformId: match.id,
-      merchantStatus: match.merchantStatus,
-      platformStatus: match.platformStatus,
-      merchantAmount: match.merchantAmount,
-      platformAmount: match.platformAmount,
+      id: merchantId,
+      merchantId: merchantId,
+      platformId: platformId,
+      merchantStatus: record.merchant?.status || record.status || 'N/A',
+      platformStatus: record.platform?.status || record.status || 'N/A',
+      merchantAmount: record.merchant?.amount || record.amount || 'N/A',
+      platformAmount: record.platform?.amount || record.amount || 'N/A',
       merchantData: { 
-        status: match.merchantStatus, 
-        id: match.id,
-        amount: match.merchantAmount 
+        status: record.merchant?.status || record.status || 'N/A', 
+        id: merchantId,
+        amount: record.merchant?.amount || record.amount || 'N/A'
       },
       platformData: { 
-        status: match.platformStatus, 
-        id: match.id,
-        amount: match.platformAmount 
+        status: record.platform?.status || record.status || 'N/A', 
+        id: platformId,
+        amount: record.platform?.amount || record.amount || 'N/A'
       },
       reconciliationStatus: 'matched',
       matchType: 'full_match',
