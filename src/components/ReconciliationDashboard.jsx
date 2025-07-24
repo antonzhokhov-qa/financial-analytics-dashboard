@@ -124,12 +124,12 @@ const ReconciliationDashboard = () => {
 
     try {
       // Проверяем структуру данных
-      if (!filesData || !filesData.results || !filesData.results.results) {
+      if (!filesData || !filesData.results) {
         throw new Error('Неверная структура данных от сервера')
       }
 
       // Результаты уже получены от сервера
-      const { results, metadata } = filesData.results
+      const results = filesData.results
       
       console.log('📊 Raw results from server:', results)
       
@@ -145,7 +145,7 @@ const ReconciliationDashboard = () => {
       setReconciliationData({
         formattedData,
         rawResults: results,
-        metadata,
+        metadata: filesData.metadata,
         fileNames: {
           merchant: filesData.merchantFileName,
           platform: filesData.platformFileName
