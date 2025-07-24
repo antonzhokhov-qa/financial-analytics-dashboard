@@ -3,6 +3,7 @@ import { parseCSV } from '../utils/csvParser'
 import { calculateMetrics, generateInsights, getAmountRanges, getConversionByAmount, getStatusDistribution, getCompanyDistribution, getPaymentMethodDistribution, getTimeSeriesData, getTopUsers, detectAnomalies } from '../utils/analytics'
 import FileUpload from './FileUpload'
 import ProviderSelector from './ProviderSelector'
+import BigFileProcessor from './BigFileProcessor'
 import MetricsGrid from './MetricsGrid'
 import ChartsGrid from './ChartsGrid'
 import DataTable from './DataTable'
@@ -33,6 +34,7 @@ const Dashboard = ({
   const [timezone, setTimezone] = useState('UTC') // Добавляем поддержку часовых поясов
   const [selectedProvider, setSelectedProvider] = useState(null) // Добавляем состояние выбранного провайдера
   const [showProviderSelector, setShowProviderSelector] = useState(true) // Показываем селектор провайдера
+  const [processingMode, setProcessingMode] = useState('client') // 'client' или 'server'
   const [filters, setFilters] = useState({
     status: '',
     company: '',
@@ -81,6 +83,26 @@ const Dashboard = ({
     setMetrics(null)
     setInsights([])
     setAnomalies([])
+  }
+
+  // Обработка результатов с сервера
+  const handleServerResults = (serverData) => {
+    console.log('📊 Получены результаты с сервера:', serverData)
+    
+    // Устанавливаем данные из сервера
+    setData(serverData.data || [])
+    setFilteredData(serverData.data || [])
+    setMetrics(serverData.metrics)
+    
+    // Определяем тип данных по провайдеру
+    const detectedType = serverData.metrics?.provider === 'payshack' ? 'merchant' : 'merchant'
+    setDataType(detectedType)
+    
+    console.log('✅ Данные с сервера установлены:', {
+      dataLength: serverData.data?.length || 0,
+      metrics: serverData.metrics,
+      dataType: detectedType
+    })
   }
 
   // Обработка загрузки файла
@@ -369,8 +391,52 @@ const Dashboard = ({
             </p>
           </div>
 
+          {/* Переключатель режимов */}
+          <div className="bg-white/10 backdrop-blur-xl rounded-xl p-4 border border-white/20 mb-6">
+            <div className="flex items-center justify-center space-x-4">
+              <span className="text-white font-medium">Режим обработки:</span>
+              <div className="flex bg-white/10 rounded-lg p-1">
+                <button
+                  onClick={() => setProcessingMode('client')}
+                  className={`px-4 py-2 rounded-md transition-all ${
+                    processingMode === 'client'
+                      ? 'bg-blue-500 text-white shadow-lg'
+                      : 'text-white/70 hover:text-white'
+                  }`}
+                >
+                  🖥️ Браузер
+                </button>
+                <button
+                  onClick={() => setProcessingMode('server')}
+                  className={`px-4 py-2 rounded-md transition-all ${
+                    processingMode === 'server'
+                      ? 'bg-purple-500 text-white shadow-lg'
+                      : 'text-white/70 hover:text-white'
+                  }`}
+                >
+                  🚀 Сервер
+                </button>
+              </div>
+            </div>
+            <div className="text-center mt-2">
+              <p className="text-white/60 text-sm">
+                {processingMode === 'client' 
+                  ? 'Обработка в браузере (до 10,000 записей)'
+                  : 'Серверная обработка (без ограничений, WebSocket прогресс)'
+                }
+              </p>
+            </div>
+          </div>
+
           {/* Загрузка файла */}
-          <FileUpload onFileUpload={handleFileUpload} loading={loading} />
+          {processingMode === 'client' ? (
+            <FileUpload onFileUpload={handleFileUpload} loading={loading} />
+          ) : (
+            <BigFileProcessor 
+              selectedProvider={{ id: selectedProvider, name: selectedProvider === 'optipay' ? 'Optipay' : 'Payshack' }}
+              onResults={handleServerResults}
+            />
+          )}
           
           {/* Кнопка возврата к выбору провайдера */}
           <div className="text-center">
