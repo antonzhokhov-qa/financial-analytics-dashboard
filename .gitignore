@@ -91,4 +91,12 @@ temp/
 .dynamodb/
 
 # TernJS port file
-.tern-port 
+.tern-port
+
+# Netlify
+.netlify
+
+# CSV files
+*.csv
+*.xlsx
+uploads/ 
