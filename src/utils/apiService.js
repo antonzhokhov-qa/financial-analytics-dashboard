@@ -332,16 +332,20 @@ export async function performReconciliationAPI(merchantFile, platformFile) {
     console.log('📤 Sending files to reconciliation server...')
     console.log('🔗 API URL:', RECONCILIATION_API_URL)
     
-    // Проверяем размер файлов (максимум 10MB каждый)
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (merchantFile.size > maxSize || platformFile.size > maxSize) {
-      throw new Error('Файл слишком большой. Максимальный размер: 10MB')
-    }
+    // Проверяем размер файлов (максимум 50MB каждый)
+    const maxSize = 50 * 1024 * 1024; // 50MB
     
     console.log('📊 File sizes:', {
       merchant: `${(merchantFile.size / 1024 / 1024).toFixed(2)}MB`,
-      platform: `${(platformFile.size / 1024 / 1024).toFixed(2)}MB`
+      platform: `${(platformFile.size / 1024 / 1024).toFixed(2)}MB`,
+      merchantBytes: merchantFile.size,
+      platformBytes: platformFile.size,
+      maxSizeBytes: maxSize
     })
+    
+    if (merchantFile.size > maxSize || platformFile.size > maxSize) {
+      throw new Error(`Файл слишком большой. Максимальный размер: 50MB. Merchant: ${(merchantFile.size / 1024 / 1024).toFixed(2)}MB, Platform: ${(platformFile.size / 1024 / 1024).toFixed(2)}MB`)
+    }
     
     // Читаем файлы как base64
     const merchantBuffer = await merchantFile.arrayBuffer()

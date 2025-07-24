@@ -226,12 +226,12 @@ const handler = async (event, context) => {
     console.log('📊 Files parsed successfully');
 
     // Проверяем размер данных
-    if (merchantData.length > 10000 || platformData.length > 10000) {
+    if (merchantData.length > 50000 || platformData.length > 50000) {
       return {
         statusCode: 400,
         headers,
         body: JSON.stringify({ 
-          error: 'File too large. Maximum 10,000 records per file allowed.' 
+          error: 'File too large. Maximum 50,000 records per file allowed.' 
         })
       };
     }
