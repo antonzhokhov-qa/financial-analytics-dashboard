@@ -332,12 +332,27 @@ export async function performReconciliationAPI(merchantFile, platformFile) {
     console.log('📤 Sending files to reconciliation server...')
     console.log('🔗 API URL:', RECONCILIATION_API_URL)
     
+    // Проверяем размер файлов (максимум 10MB каждый)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (merchantFile.size > maxSize || platformFile.size > maxSize) {
+      throw new Error('Файл слишком большой. Максимальный размер: 10MB')
+    }
+    
+    console.log('📊 File sizes:', {
+      merchant: `${(merchantFile.size / 1024 / 1024).toFixed(2)}MB`,
+      platform: `${(platformFile.size / 1024 / 1024).toFixed(2)}MB`
+    })
+    
     // Читаем файлы как base64
     const merchantBuffer = await merchantFile.arrayBuffer()
     const platformBuffer = await platformFile.arrayBuffer()
     
+    console.log('📄 Converting files to base64...')
+    
     const merchantBase64 = btoa(String.fromCharCode(...new Uint8Array(merchantBuffer)))
     const platformBase64 = btoa(String.fromCharCode(...new Uint8Array(platformBuffer)))
+    
+    console.log('📤 Sending request to server...')
     
     const response = await fetch(`${RECONCILIATION_API_URL}/reconcile`, {
       method: 'POST',
@@ -356,7 +371,7 @@ export async function performReconciliationAPI(merchantFile, platformFile) {
     }
     
     const result = await response.json()
-    console.log('✅ Reconciliation completed successfully:', result)
+    console.log('✅ Reconciliation completed successfully')
     
     return result
     

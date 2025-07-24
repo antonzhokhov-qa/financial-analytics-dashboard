@@ -59,34 +59,25 @@ function findTrackingId(record) {
 
 // Основная функция сверки
 function performReconciliation(merchantData, platformData) {
-  console.log('🔍 Detected types - Merchant:', typeof merchantData, 'Platform:', typeof platformData);
+  console.log('🔍 Starting reconciliation...');
+  console.log('📊 Merchant records:', merchantData.length);
+  console.log('🏦 Platform records:', platformData.length);
   
   if (!Array.isArray(merchantData) || !Array.isArray(platformData)) {
     throw new Error('Both merchant and platform data must be arrays');
   }
   
-  console.log('🔍 About to call performReconciliation with:', {
-    merchantDataLength: merchantData.length,
-    platformDataLength: platformData.length,
-    merchantDataFirstRecord: merchantData[0],
-    platformDataFirstRecord: platformData[0]
-  });
-  
-  console.log('🔄 Starting reconciliation...');
-  console.log('📊 Merchant records:', merchantData.length);
-  console.log('🏦 Platform records:', platformData.length);
-  
   // Создаем индекс для платформенных данных по tracking ID
   const platformIndex = new Map();
   
-  platformData.forEach((record, index) => {
+  platformData.forEach((record) => {
     const { trackingId } = findTrackingId(record);
     if (trackingId) {
-      platformIndex.set(trackingId, { record, index });
+      platformIndex.set(trackingId, { record });
     }
   });
   
-  console.log('📋 Platform index keys:', platformIndex.size);
+  console.log('📋 Platform index created with', platformIndex.size, 'keys');
   
   // Обрабатываем merchant данные
   const results = {
@@ -101,16 +92,12 @@ function performReconciliation(merchantData, platformData) {
   merchantData.forEach((merchantRecord, merchantIndex) => {
     const { trackingId, trackingKey } = findTrackingId(merchantRecord);
     
-    if (merchantIndex < 5) {
-      console.log('🔍 Merchant row', merchantIndex + 1, ':', {
-        'Found trackingId': trackingId,
-        'Found trackingKey': trackingKey,
-        'Status': merchantRecord.Status,
-        'All keys': Object.keys(merchantRecord),
-        'First few keys with values': Object.keys(merchantRecord).slice(0, 5).map(key => ({
-          key,
-          value: merchantRecord[key]
-        }))
+    // Логируем только первые несколько записей
+    if (merchantIndex < 3) {
+      console.log('🔍 Processing merchant record', merchantIndex + 1, ':', {
+        trackingId,
+        trackingKey,
+        status: merchantRecord.Status
       });
     }
     
@@ -140,17 +127,6 @@ function performReconciliation(merchantData, platformData) {
     // Сравниваем статусы
     const merchantStatus = normalizeStatus(merchantRecord.Status);
     const platformStatus = normalizeStatus(platformRecord.Status);
-    
-    if (merchantIndex < 10) {
-      console.log('🔍 Processing merchant record', merchantIndex + 1, ':', {
-        trackingId,
-        merchantStatus: merchantRecord.Status,
-        merchantNormalizedStatus: merchantStatus,
-        hasPlatformMatch: !!platformMatch,
-        platformStatus: platformRecord.Status,
-        platformNormalizedStatus: platformStatus
-      });
-    }
     
     if (merchantStatus === platformStatus) {
       results.matched.push({
@@ -198,13 +174,6 @@ function performReconciliation(merchantData, platformData) {
   
   console.log('✅ Reconciliation complete:', summary);
   
-  if (results.platformOnly.length > 0) {
-    console.log('🔍 Первые 5 записей только на платформе:');
-    results.platformOnly.slice(0, 5).forEach((item, index) => {
-      console.log(`  ${index + 1}. ID: ${item.trackingId}, Status: ${item.record.Status}`);
-    });
-  }
-  
   return {
     summary,
     results
@@ -248,12 +217,31 @@ const handler = async (event, context) => {
       };
     }
 
+    console.log('📤 Starting file processing...');
+
     // Парсим CSV данные
     const merchantData = await parseCSVBuffer(Buffer.from(merchantFile, 'base64'));
     const platformData = await parseCSVBuffer(Buffer.from(platformFile, 'base64'));
 
+    console.log('📊 Files parsed successfully');
+
+    // Проверяем размер данных
+    if (merchantData.length > 10000 || platformData.length > 10000) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ 
+          error: 'File too large. Maximum 10,000 records per file allowed.' 
+        })
+      };
+    }
+
+    console.log('🔄 Starting reconciliation...');
+
     // Выполняем сверку
     const reconciliationResult = performReconciliation(merchantData, platformData);
+
+    console.log('✅ Reconciliation completed successfully');
 
     return {
       statusCode: 200,
@@ -262,7 +250,7 @@ const handler = async (event, context) => {
     };
 
   } catch (error) {
-    console.error('Error in reconcile function:', error);
+    console.error('❌ Error in reconcile function:', error);
     
     return {
       statusCode: 500,
