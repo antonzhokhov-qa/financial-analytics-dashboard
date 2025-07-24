@@ -8,6 +8,8 @@ import MetricsGrid from './MetricsGrid'
 import ChartsGrid from './ChartsGrid'
 import DataTable from './DataTable'
 import APIDataTable from './APIDataTable'
+import VirtualizedDataTable from './VirtualizedDataTable'
+import EnhancedExportData from './EnhancedExportData'
 import Filters from './Filters'
 import InsightsSection from './InsightsSection'
 import AnomalyDetection from './AnomalyDetection'
@@ -645,8 +647,22 @@ const Dashboard = ({
         {dataSource === 'api' ? (
           <APIDataTable data={filteredData} />
         ) : (
-          <DataTable data={filteredData} dataType={dataType} />
+          <VirtualizedDataTable 
+            data={filteredData} 
+            dataType={dataType}
+            isServerData={processingMode === 'server'}
+            jobId={metrics?.jobId}
+          />
         )}
+
+        {/* Экспорт данных */}
+        <EnhancedExportData 
+          data={filteredData}
+          metrics={metrics}
+          fileName={`analytics-${selectedProvider || dataType}-${new Date().toISOString().split('T')[0]}`}
+          isServerData={processingMode === 'server'}
+          jobId={metrics?.jobId}
+        />
 
         {/* Инсайты */}
         {insights.length > 0 && (
