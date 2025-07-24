@@ -3,7 +3,7 @@ class BigFileApiService {
   constructor() {
     this.baseURL = process.env.NODE_ENV === 'production' 
       ? 'https://your-api-domain.com' 
-      : 'http://localhost:3001'
+      : 'http://localhost:3002'
     this.wsURL = process.env.NODE_ENV === 'production' 
       ? 'wss://your-api-domain.com:8080' 
       : 'ws://localhost:8080'
