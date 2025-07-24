@@ -324,7 +324,7 @@ export function normalizeAPIData(apiData) {
 // Сервис для работы с API сверки
 
 const RECONCILIATION_API_URL = import.meta.env.PROD 
-  ? '/api' 
+  ? '/.netlify/functions' 
   : 'http://localhost:3002/api'
 
 export async function performReconciliationAPI(merchantFile, platformFile) {

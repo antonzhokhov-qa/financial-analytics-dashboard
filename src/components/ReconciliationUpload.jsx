@@ -28,7 +28,7 @@ const ReconciliationUpload = ({ onFilesUploaded }) => {
       // Проверяем доступность сервера
       const serverAvailable = await checkServerHealth()
       if (!serverAvailable) {
-        throw new Error('Сервер сверки недоступен. Убедитесь, что сервер запущен на порту 3002.')
+        throw new Error('Сервер сверки недоступен. Проверьте подключение к интернету и попробуйте снова.')
       }
 
       // Отправляем файлы на сервер для сверки
