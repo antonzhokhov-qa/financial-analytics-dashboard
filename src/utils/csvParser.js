@@ -253,6 +253,67 @@ function normalizeData(data, format, dataType = 'merchant') {
     console.log('🏪 - normalizedStatus:', normalizedMerchant[0]?.normalizedStatus)
     
     return normalizedMerchant
+  } else if (dataType === 'payshack') {
+    // Нормализация для формата Payshack
+    console.log('🏪 Normalizing Payshack data:', data.length, 'records')
+    
+    // Логируем первые несколько записей для анализа
+    if (data.length > 0) {
+      console.log('🔍 First Payshack record raw:', data[0])
+    }
+    
+    const normalizedPayshack = data.map(row => ({
+      // Основные поля Payshack
+      id: row['Transaction Id'] || row['Transaction ID'] || '',
+      orderId: row['Order Id'] || row['Order ID'] || '',
+      transactionId: row['Transaction Id'] || row['Transaction ID'] || '',
+      utr: row['UTR'] || '',
+      amount: parseFloat((row['Amount'] || '0').replace(',', '.')) || 0,
+      status: row['Status'] || '',
+      remarks: row['Remarks'] || '',
+      
+      // Время
+      createdAt: row['Created Date'] || row['Created date'] || '',
+      
+      // Нормализованные поля для совместимости с системой
+      trackingId: row['Transaction Id'] || row['Transaction ID'] || '', // Используем Transaction Id как tracking ID
+      normalizedStatus: normalizeStatus(row['Status'] || ''),
+      
+      // Статусы для аналитики
+      isCompleted: (row['Status'] || '').toLowerCase() === 'success',
+      isFailed: (row['Status'] || '').toLowerCase() === 'failed',
+      isInitiated: (row['Status'] || '').toLowerCase() === 'initiated',
+      
+      // Тип транзакции (определяем по статусу и сумме)
+      type: determineTransactionType('', parseFloat((row['Amount'] || '0').replace(',', '.'))),
+      transactionType: determineTransactionType('', parseFloat((row['Amount'] || '0').replace(',', '.'))),
+      isDeposit: parseFloat((row['Amount'] || '0').replace(',', '.')) > 0,
+      isWithdraw: parseFloat((row['Amount'] || '0').replace(',', '.')) < 0,
+      
+      // Форматированные суммы (в INR для Payshack)
+      amountFormatted: new Intl.NumberFormat('en-IN', { 
+        style: 'currency', 
+        currency: 'INR' 
+      }).format(parseFloat((row['Amount'] || '0').replace(',', '.')) || 0),
+      
+      // Дополнительные поля для совместимости
+      currency: 'INR', // Payshack работает в INR
+      company: 'Payshack',
+      paymentMethod: 'UPI', // Основной метод для Payshack
+      
+      // Метаданные
+      dataSource: 'payshack',
+      provider: 'payshack',
+      originalData: row // Сохраняем оригинальные данные для отладки
+    }))
+    
+    console.log('🏪 Payshack normalization complete. Sample record:', normalizedPayshack[0])
+    console.log('🏪 Key fields for reconciliation:')
+    console.log('🏪 - transactionId:', normalizedPayshack[0]?.transactionId)
+    console.log('🏪 - status:', normalizedPayshack[0]?.status)
+    console.log('🏪 - normalizedStatus:', normalizedPayshack[0]?.normalizedStatus)
+    
+    return normalizedPayshack
   } else {
     // Fallback для неизвестного типа данных
     console.log('⚠️ Unknown data type, using fallback normalization')
@@ -274,13 +335,18 @@ function detectDataFormat(headers) {
     'original error message', 'endpoint'
   ]
   
-  // Точные заголовки провайдера
-  const merchantHeaders = [
+  // Точные заголовки провайдера Optipay
+  const optipayHeaders = [
     'tracking id', 'reference id', 'status', 'payment method', 'payment gateway',
     'amount', 'transaction amount', 'type', 'company', 'fee', 'fee ratio',
     'name', 'user ıd', 'user name', 'creation time', 'processed time',
     'receiver account name', 'receiver account number', 'hash code',
     'client ip address', 'receipt', 'explanation', '[explanation type]'
+  ]
+
+  // Точные заголовки провайдера Payshack
+  const payshackHeaders = [
+    'created date', 'order id', 'transaction id', 'utr', 'amount', 'status', 'remarks'
   ]
   
   // Проверяем точное соответствие заголовкам платформы
@@ -288,24 +354,36 @@ function detectDataFormat(headers) {
     headerStr.includes(header)
   ).length
   
-  // Проверяем точное соответствие заголовкам провайдера
-  const merchantMatchCount = merchantHeaders.filter(header => 
+  // Проверяем точное соответствие заголовкам Optipay
+  const optipayMatchCount = optipayHeaders.filter(header => 
+    headerStr.includes(header)
+  ).length
+
+  // Проверяем точное соответствие заголовкам Payshack
+  const payshackMatchCount = payshackHeaders.filter(header => 
     headerStr.includes(header)
   ).length
   
   console.log('📊 Platform header matches:', platformMatchCount, '/', platformHeaders.length)
-  console.log('📊 Merchant header matches:', merchantMatchCount, '/', merchantHeaders.length)
+  console.log('📊 Optipay header matches:', optipayMatchCount, '/', optipayHeaders.length)
+  console.log('📊 Payshack header matches:', payshackMatchCount, '/', payshackHeaders.length)
   
   // Если больше совпадений с платформой
-  if (platformMatchCount > merchantMatchCount && platformMatchCount >= 10) {
+  if (platformMatchCount > Math.max(optipayMatchCount, payshackMatchCount) && platformMatchCount >= 10) {
     console.log('📊 Detected: Platform format (exact match)')
     return 'platform'
   }
   
-  // Если больше совпадений с провайдером
-  if (merchantMatchCount > platformMatchCount && merchantMatchCount >= 10) {
-    console.log('📊 Detected: Merchant format (exact match)')
-    return 'merchant'
+  // Если больше совпадений с Payshack
+  if (payshackMatchCount > Math.max(platformMatchCount, optipayMatchCount) && payshackMatchCount >= 5) {
+    console.log('📊 Detected: Payshack format (exact match)')
+    return 'payshack'
+  }
+  
+  // Если больше совпадений с Optipay
+  if (optipayMatchCount > Math.max(platformMatchCount, payshackMatchCount) && optipayMatchCount >= 10) {
+    console.log('📊 Detected: Optipay format (exact match)')
+    return 'optipay'
   }
   
   // Fallback на старую логику
@@ -319,13 +397,18 @@ function detectDataFormat(headers) {
   
   if (headerStr.includes('tracking id') || 
       (headerStr.includes('status') && headerStr.includes('amount'))) {
-    console.log('📊 Detected: Merchant format (fallback)')
-    return 'merchant'
+    console.log('📊 Detected: Optipay format (fallback)')
+    return 'optipay'
+  }
+
+  if (headerStr.includes('transaction id') && headerStr.includes('order id')) {
+    console.log('📊 Detected: Payshack format (fallback)')
+    return 'payshack'
   }
   
-  // По умолчанию считаем провайдером
-  console.log('📊 Default: Merchant format')
-  return 'merchant'
+  // По умолчанию считаем Optipay
+  console.log('📊 Default: Optipay format')
+  return 'optipay'
 }
 
 export function parseCSV(text, dataType = null) {

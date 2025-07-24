@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { parseCSV } from '../utils/csvParser'
 import { calculateMetrics, generateInsights, getAmountRanges, getConversionByAmount, getStatusDistribution, getCompanyDistribution, getPaymentMethodDistribution, getTimeSeriesData, getTopUsers, detectAnomalies } from '../utils/analytics'
 import FileUpload from './FileUpload'
+import ProviderSelector from './ProviderSelector'
 import MetricsGrid from './MetricsGrid'
 import ChartsGrid from './ChartsGrid'
 import DataTable from './DataTable'
@@ -30,6 +31,8 @@ const Dashboard = ({
   const [error, setError] = useState(null)
   const [dataType, setDataType] = useState(dataSource === 'api' ? 'platform' : null) // Определяется автоматически или по источнику
   const [timezone, setTimezone] = useState('UTC') // Добавляем поддержку часовых поясов
+  const [selectedProvider, setSelectedProvider] = useState(null) // Добавляем состояние выбранного провайдера
+  const [showProviderSelector, setShowProviderSelector] = useState(true) // Показываем селектор провайдера
   const [filters, setFilters] = useState({
     status: '',
     company: '',
@@ -63,6 +66,23 @@ const Dashboard = ({
     return convertedDate
   }
 
+  // Обработка выбора провайдера
+  const handleProviderSelect = (providerId) => {
+    setSelectedProvider(providerId)
+    setShowProviderSelector(false)
+  }
+
+  // Возврат к выбору провайдера
+  const handleBackToProviderSelector = () => {
+    setShowProviderSelector(true)
+    setSelectedProvider(null)
+    setData([])
+    setFilteredData([])
+    setMetrics(null)
+    setInsights([])
+    setAnomalies([])
+  }
+
   // Обработка загрузки файла
   const handleFileUpload = (file) => {
     setLoading(true)
@@ -74,8 +94,8 @@ const Dashboard = ({
         const text = e.target.result
         console.log('File content preview:', text.substring(0, 500))
         
-        // Парсим CSV с автоопределением типа
-        const parsedData = parseCSV(text)
+        // Парсим CSV с учетом выбранного провайдера
+        const parsedData = parseCSV(text, selectedProvider)
         console.log('Parsed data:', parsedData.length, 'rows')
         
         if (parsedData.length === 0) {
@@ -319,8 +339,20 @@ const Dashboard = ({
     }
   }, [filteredData, dataType])
 
-  // Если данные не загружены и это CSV режим - показываем экран загрузки
+  // Если данные не загружены и это CSV режим - показываем селектор провайдера или экран загрузки
   if (data.length === 0 && dataSource === 'csv') {
+    if (showProviderSelector) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+          <ProviderSelector 
+            onProviderSelect={handleProviderSelect}
+            selectedProvider={selectedProvider}
+            onBack={onBackToSelector}
+          />
+        </div>
+      )
+    }
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
         <div className="w-full max-w-4xl space-y-8">
@@ -331,12 +363,24 @@ const Dashboard = ({
             </div>
             <h1 className="text-4xl font-bold text-white">Аналитика операций</h1>
             <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-              Загрузите CSV файл для анализа финансовых операций
+              {selectedProvider === 'optipay' ? '🇹🇷 Optipay (Турция)' : 
+               selectedProvider === 'payshack' ? '🇮🇳 Payshack (Индия)' : 
+               'Загрузите CSV файл для анализа финансовых операций'}
             </p>
           </div>
 
           {/* Загрузка файла */}
           <FileUpload onFileUpload={handleFileUpload} loading={loading} />
+          
+          {/* Кнопка возврата к выбору провайдера */}
+          <div className="text-center">
+            <button
+              onClick={handleBackToProviderSelector}
+              className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              ← Выбрать другого провайдера
+            </button>
+          </div>
           
           {error && (
             <div className="bg-red-500/20 border border-red-500/30 rounded-xl p-4 text-red-300">
@@ -368,7 +412,9 @@ const Dashboard = ({
                       <span className="text-green-400 ml-1">🌐 API платформы</span>
                     ) : (
                       <span className="text-blue-400 ml-1">
-                        📂 {dataType === 'platform' ? 'Платформа' : 'Провайдер'}
+                        📂 {selectedProvider === 'optipay' ? '🇹🇷 Optipay' : 
+                            selectedProvider === 'payshack' ? '🇮🇳 Payshack' : 
+                            dataType === 'platform' ? 'Платформа' : 'Провайдер'}
                       </span>
                     )}
                   </p>
@@ -382,6 +428,16 @@ const Dashboard = ({
             </div>
             
             <div className="flex items-center space-x-4">
+              {/* Кнопка возврата к выбору провайдера (только для CSV) */}
+              {dataSource === 'csv' && selectedProvider && (
+                <button
+                  onClick={handleBackToProviderSelector}
+                  className="px-4 py-2 bg-orange-500/20 text-orange-300 rounded-lg hover:bg-orange-500/30 transition-colors duration-200"
+                >
+                  ← Выбрать провайдера
+                </button>
+              )}
+              
               {/* Кнопка возврата к выбору источника */}
               {onBackToSelector && (
                 <button
