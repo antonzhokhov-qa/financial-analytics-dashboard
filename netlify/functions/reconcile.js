@@ -23,161 +23,306 @@ function parseCSVBuffer(buffer) {
 
 // Функция для нормализации статуса
 function normalizeStatus(status) {
-  if (!status) return 'unknown';
+  if (!status) return '';
   
-  const lowerStatus = status.toLowerCase();
+  const normalized = status.toLowerCase().trim();
   
-  if (lowerStatus.includes('success') || lowerStatus.includes('completed') || lowerStatus.includes('successful')) {
-    return 'success';
-  } else if (lowerStatus.includes('failed') || lowerStatus.includes('canceled') || lowerStatus.includes('cancelled') || lowerStatus.includes('error')) {
-    return 'failed';
-  } else if (lowerStatus.includes('pending') || lowerStatus.includes('in progress') || lowerStatus.includes('processing')) {
-    return 'pending';
+  // Маппинг статусов
+  const statusMap = {
+    'success': 'success',
+    'completed': 'success',
+    'failed': 'failed',
+    'error': 'failed',
+    'canceled': 'failed',        // Canceled = Failed (неуспешная транзакция)
+    'cancelled': 'failed',       // Cancelled = Failed (неуспешная транзакция)
+    'pending': 'pending',
+    'processing': 'pending',
+    'in progress': 'pending',
+    'in_progress': 'pending'
+  };
+  
+  return statusMap[normalized] || normalized;
+}
+
+// Функция для определения типа данных
+function detectDataType(headers) {
+  const headerStr = headers.join(' ').toLowerCase();
+  
+  // Проверяем наличие ключевых заголовков платформы
+  const platformKeywords = ['foreign operation id', 'client operation id', 'initial amount', 'result amount'];
+  const platformMatches = platformKeywords.filter(keyword => headerStr.includes(keyword)).length;
+  
+  if (platformMatches >= 2) {
+    return 'platform';
+  }
+  
+  // Проверяем наличие ключевых заголовков провайдера
+  const merchantKeywords = ['tracking id', 'payment method', 'hash code'];
+  const merchantMatches = merchantKeywords.filter(keyword => headerStr.includes(keyword)).length;
+  
+  if (merchantMatches >= 2) {
+    return 'merchant';
   }
   
   return 'unknown';
 }
 
-// Функция для поиска tracking ID в записи
-function findTrackingId(record) {
-  const trackingKeys = [
-    'Tracking Id', 'tracking_id', 'trackingId', 'TrackingId',
-    'Transaction Id', 'transaction_id', 'transactionId', 'TransactionId',
-    'Reference Id', 'reference_id', 'referenceId', 'ReferenceId',
-    'Operation Id', 'operation_id', 'operationId', 'OperationId',
-    'ID', 'id', 'Id'
-  ];
-  
-  for (const key of trackingKeys) {
-    if (record[key]) {
-      return { trackingId: record[key], trackingKey: key };
-    }
-  }
-  
-  return { trackingId: null, trackingKey: null };
-}
-
-// Основная функция сверки
+// Функция для сверки данных
 function performReconciliation(merchantData, platformData) {
-  console.log('🔍 Starting reconciliation...');
+  console.log('🔄 Starting reconciliation...');
   console.log('📊 Merchant records:', merchantData.length);
   console.log('🏦 Platform records:', platformData.length);
   
-  if (!Array.isArray(merchantData) || !Array.isArray(platformData)) {
-    throw new Error('Both merchant and platform data must be arrays');
+  // Проверяем данные на входе
+  if (merchantData.length > 0) {
+    console.log('🔍 First merchant record in performReconciliation:', merchantData[0]);
+    console.log('🔍 First merchant record keys:', Object.keys(merchantData[0]));
+    console.log('🔍 First merchant record Tracking Id:', merchantData[0]['Tracking Id']);
   }
   
-  // Создаем индекс для платформенных данных по tracking ID
-  const platformIndex = new Map();
+  // Создаем индексы
+  const merchantIndex = {};
+  const platformIndex = {};
   
-  platformData.forEach((record) => {
-    const { trackingId } = findTrackingId(record);
+  // Индексируем данные провайдера
+  merchantData.forEach((record, index) => {
+    // Ищем ключ Tracking Id среди всех ключей объекта
+    let trackingId = null;
+    let trackingKey = null;
+    
+    // Проверяем все возможные варианты ключа
+    const possibleKeys = ['Tracking Id', 'Tracking ID', 'ID', 'tracking id', 'TrackingId', 'trackingId'];
+    
+    for (const key of possibleKeys) {
+      if (record[key]) {
+        trackingId = record[key];
+        trackingKey = key;
+        break;
+      }
+    }
+    
+    // Если не нашли, ищем среди всех ключей объекта
+    if (!trackingId) {
+      const allKeys = Object.keys(record);
+      for (const key of allKeys) {
+        if (key.toLowerCase().includes('tracking') || key.toLowerCase().includes('id')) {
+          trackingId = record[key];
+          trackingKey = key;
+          break;
+        }
+      }
+    }
+    
+    // Отладка первых 5 записей
+    if (index < 5) {
+      console.log(`🔍 Merchant row ${index + 1}:`, {
+        'Found trackingId': trackingId,
+        'Found trackingKey': trackingKey,
+        'Status': record['Status'],
+        'All keys': Object.keys(record),
+        'First few keys with values': Object.keys(record).slice(0, 5).map(key => ({ key, value: record[key] }))
+      });
+    }
+    
     if (trackingId) {
-      platformIndex.set(trackingId, { record });
+      merchantIndex[trackingId] = {
+        ...record,
+        trackingId,
+        normalizedStatus: normalizeStatus(record['Status'] || record['Статус'])
+      };
     }
   });
   
-  console.log('📋 Platform index created with', platformIndex.size, 'keys');
+  // Индексируем данные платформы
+  platformData.forEach((record, index) => {
+    // Ищем ключ Foreign Operation Id среди всех ключей объекта
+    let foreignOpId = null;
+    let foreignOpKey = null;
+    
+    // Проверяем все возможные варианты ключа
+    const possibleKeys = ['Foreign Operation Id', 'foreign operation id', 'ForeignOperationId', 'foreignOperationId'];
+    
+    for (const key of possibleKeys) {
+      if (record[key]) {
+        foreignOpId = record[key];
+        foreignOpKey = key;
+        break;
+      }
+    }
+    
+    // Если не нашли, ищем среди всех ключей объекта
+    if (!foreignOpId) {
+      const allKeys = Object.keys(record);
+      for (const key of allKeys) {
+        if (key.toLowerCase().includes('foreign') && key.toLowerCase().includes('operation')) {
+          foreignOpId = record[key];
+          foreignOpKey = key;
+          break;
+        }
+      }
+    }
+    
+    if (foreignOpId) {
+      platformIndex[foreignOpId] = {
+        ...record,
+        foreignOperationId: foreignOpId,
+        normalizedStatus: normalizeStatus(record['Status'])
+      };
+    }
+  });
   
-  // Обрабатываем merchant данные
+  console.log('📋 Merchant index keys:', Object.keys(merchantIndex).length);
+  console.log('📋 Platform index keys:', Object.keys(platformIndex).length);
+  
+  // Результаты сверки
   const results = {
     matched: [],
     merchantOnly: [],
     platformOnly: [],
-    statusMismatch: []
+    statusMismatch: [],
+    summary: {}
   };
   
-  const processedMerchantIds = new Set();
+  // Обрабатываем данные провайдера
+  let processedCount = 0;
+  let matchedCount = 0;
   
-  merchantData.forEach((merchantRecord, merchantIndex) => {
-    const { trackingId, trackingKey } = findTrackingId(merchantRecord);
+  Object.values(merchantIndex).forEach(merchantRecord => {
+    processedCount++;
+    const platformRecord = platformIndex[merchantRecord.trackingId];
     
-    // Логируем только первые несколько записей
-    if (merchantIndex < 3) {
-      console.log('🔍 Processing merchant record', merchantIndex + 1, ':', {
-        trackingId,
-        trackingKey,
-        status: merchantRecord.Status
+    // Отладка для первых 10 записей
+    if (processedCount <= 10) {
+      console.log(`🔍 Processing merchant record ${processedCount}:`, {
+        trackingId: merchantRecord.trackingId,
+        merchantStatus: merchantRecord['Status'],
+        merchantNormalizedStatus: merchantRecord.normalizedStatus,
+        hasPlatformMatch: !!platformRecord,
+        platformStatus: platformRecord?.['Status'],
+        platformNormalizedStatus: platformRecord?.normalizedStatus
       });
     }
     
-    if (!trackingId) {
+    if (!platformRecord) {
+      // Транзакция есть только у провайдера
       results.merchantOnly.push({
-        record: merchantRecord,
-        reason: 'No tracking ID found'
-      });
-      return;
-    }
-    
-    processedMerchantIds.add(trackingId);
-    
-    const platformMatch = platformIndex.get(trackingId);
-    
-    if (!platformMatch) {
-      results.merchantOnly.push({
-        record: merchantRecord,
-        trackingId,
-        reason: 'No matching platform record'
-      });
-      return;
-    }
-    
-    const { record: platformRecord } = platformMatch;
-    
-    // Сравниваем статусы
-    const merchantStatus = normalizeStatus(merchantRecord.Status);
-    const platformStatus = normalizeStatus(platformRecord.Status);
-    
-    if (merchantStatus === platformStatus) {
-      results.matched.push({
-        merchant: merchantRecord,
-        platform: platformRecord,
-        trackingId,
-        status: merchantStatus
+        id: merchantRecord.trackingId,
+        merchantStatus: merchantRecord['Status'] || merchantRecord['Статус'],
+        merchantNormalizedStatus: merchantRecord.normalizedStatus,
+        reconciliationStatus: 'merchant_only'
       });
     } else {
-      results.statusMismatch.push({
-        merchant: merchantRecord,
-        platform: platformRecord,
-        trackingId,
-        merchantStatus,
-        platformStatus
-      });
+      // Найдено соответствие, проверяем статусы
+      matchedCount++;
+      
+      // Проверяем совпадение статусов и сумм
+      const statusMatch = merchantRecord.normalizedStatus === platformRecord.normalizedStatus;
+      
+      // Нормализуем суммы для сравнения
+      const merchantAmount = parseFloat(merchantRecord['Amount'] || merchantRecord['Transaction amount'] || '0');
+      const platformAmount = parseFloat(platformRecord['Initial Amount'] || platformRecord['Result Amount'] || '0');
+      const amountMatch = Math.abs(merchantAmount - platformAmount) < 0.01; // Допуск 1 копейка
+      
+      if (statusMatch && amountMatch) {
+        // Полное совпадение по статусу и сумме
+        results.matched.push({
+          id: merchantRecord.trackingId,
+          merchantStatus: merchantRecord['Status'] || merchantRecord['Статус'],
+          platformStatus: platformRecord['Status'],
+          merchantAmount: merchantAmount,
+          platformAmount: platformAmount,
+          merchantNormalizedStatus: merchantRecord.normalizedStatus,
+          platformNormalizedStatus: platformRecord.normalizedStatus,
+          reconciliationStatus: 'matched'
+        });
+      } else if (!statusMatch && !amountMatch) {
+        // Расхождение по статусу и сумме
+        results.statusMismatch.push({
+          id: merchantRecord.trackingId,
+          merchantStatus: merchantRecord['Status'] || merchantRecord['Статус'],
+          platformStatus: platformRecord['Status'],
+          merchantAmount: merchantAmount,
+          platformAmount: platformAmount,
+          merchantNormalizedStatus: merchantRecord.normalizedStatus,
+          platformNormalizedStatus: platformRecord.normalizedStatus,
+          reconciliationStatus: 'status_and_amount_mismatch',
+          issueType: 'status_and_amount'
+        });
+      } else if (!statusMatch) {
+        // Расхождение только по статусу
+        results.statusMismatch.push({
+          id: merchantRecord.trackingId,
+          merchantStatus: merchantRecord['Status'] || merchantRecord['Статус'],
+          platformStatus: platformRecord['Status'],
+          merchantAmount: merchantAmount,
+          platformAmount: platformAmount,
+          merchantNormalizedStatus: merchantRecord.normalizedStatus,
+          platformNormalizedStatus: platformRecord.normalizedStatus,
+          reconciliationStatus: 'status_mismatch',
+          issueType: 'status_only'
+        });
+      } else {
+        // Расхождение только по сумме
+        results.statusMismatch.push({
+          id: merchantRecord.trackingId,
+          merchantStatus: merchantRecord['Status'] || merchantRecord['Статус'],
+          platformStatus: platformRecord['Status'],
+          merchantAmount: merchantAmount,
+          platformAmount: platformAmount,
+          merchantNormalizedStatus: merchantRecord.normalizedStatus,
+          platformNormalizedStatus: platformRecord.normalizedStatus,
+          reconciliationStatus: 'amount_mismatch',
+          issueType: 'amount_only'
+        });
+      }
     }
   });
   
-  console.log('📊 Processed merchant records:', merchantData.length);
-  
-  // Находим записи только на платформе
-  platformData.forEach((platformRecord) => {
-    const { trackingId } = findTrackingId(platformRecord);
-    if (trackingId && !processedMerchantIds.has(trackingId)) {
+  // Обрабатываем данные платформы (ищем записи только на платформе)
+  Object.values(platformIndex).forEach(platformRecord => {
+    if (!merchantIndex[platformRecord.foreignOperationId]) {
       results.platformOnly.push({
-        record: platformRecord,
-        trackingId,
-        reason: 'No matching merchant record'
+        id: platformRecord.foreignOperationId,
+        platformStatus: platformRecord['Status'],
+        platformNormalizedStatus: platformRecord.normalizedStatus,
+        reconciliationStatus: 'platform_only'
       });
     }
   });
   
-  console.log('🔗 Found matches:', results.matched.length);
+  console.log('📊 Processed merchant records:', processedCount);
+  console.log('🔗 Found matches:', matchedCount);
   
-  const summary = {
-    totalMerchant: merchantData.length,
-    totalPlatform: platformData.length,
-    matched: results.matched.length,
-    merchantOnly: results.merchantOnly.length,
-    platformOnly: results.platformOnly.length,
-    statusMismatch: results.statusMismatch.length,
-    matchRate: `${((results.matched.length / merchantData.length) * 100).toFixed(2)}%`
+  // Создаем сводку
+  const totalMerchant = merchantData.length;
+  const totalPlatform = platformData.length;
+  const matched = results.matched.length;
+  const merchantOnly = results.merchantOnly.length;
+  const platformOnly = results.platformOnly.length;
+  const statusMismatch = results.statusMismatch.length;
+  const matchRate = totalMerchant > 0 ? ((matched / totalMerchant) * 100).toFixed(2) + '%' : '0%';
+  
+  results.summary = {
+    totalMerchant,
+    totalPlatform,
+    matched,
+    merchantOnly,
+    platformOnly,
+    statusMismatch,
+    matchRate
   };
   
-  console.log('✅ Reconciliation complete:', summary);
+  console.log('✅ Reconciliation complete:', results.summary);
   
-  return {
-    summary,
-    results
-  };
+  // Показываем первые 5 записей только на платформе
+  if (results.platformOnly.length > 0) {
+    console.log('🔍 Первые 5 записей только на платформе:');
+    results.platformOnly.slice(0, 5).forEach((record, index) => {
+      console.log(`  ${index + 1}. ID: ${record.id}, Status: ${record.platformStatus}`);
+    });
+  }
+  
+  return results;
 }
 
 const handler = async (event, context) => {
