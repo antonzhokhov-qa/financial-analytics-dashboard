@@ -1,6 +1,5 @@
-import csv from 'csv-parser'
-import fs from 'fs'
-import { Readable } from 'stream'
+const csv = require('csv-parser')
+const { Readable } = require('stream')
 
 // Функция для парсинга CSV из буфера
 function parseCSVBuffer(buffer) {
@@ -293,7 +292,7 @@ function performReconciliation(merchantData, platformData) {
   }
 }
 
-export default async function handler(req, res) {
+const handler = async (req, res) => {
   // Настройка CORS
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
@@ -378,4 +377,6 @@ export default async function handler(req, res) {
       details: error.message 
     })
   }
-} 
+}
+
+module.exports = handler 

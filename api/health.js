@@ -1,4 +1,4 @@
-export default function handler(req, res) {
+const handler = (req, res) => {
   // CORS заголовки
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -15,4 +15,6 @@ export default function handler(req, res) {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'
   })
-} 
+}
+
+module.exports = handler 
