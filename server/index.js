@@ -450,6 +450,173 @@ app.get('/api/health', (req, res) => {
   })
 })
 
+// Универсальный endpoint для обработки CSV файлов
+app.post('/api/process', upload.single('csvFile'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'CSV файл не предоставлен' })
+    }
+
+    const { provider = 'optipay', mode = 'auto' } = req.body
+    const filePath = req.file.path
+    const fileSizeMB = req.file.size / (1024 * 1024)
+    
+    console.log(`📁 Получен файл: ${req.file.originalname}`)
+    console.log(`📊 Размер файла: ${fileSizeMB.toFixed(2)}MB`)
+    console.log(`🏪 Провайдер: ${provider}`)
+    console.log(`⚙️ Режим: ${mode}`)
+
+    // Определяем режим обработки
+    let processingMode = mode
+    if (mode === 'auto') {
+      processingMode = fileSizeMB > 5 ? 'server' : 'client'
+      console.log(`🎯 Автоматически выбран режим: ${processingMode}`)
+    }
+
+    if (processingMode === 'server' || fileSizeMB > 10) {
+      // Серверная обработка для больших файлов
+      const jobId = `job_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`
+      console.log(`🚀 Запуск серверной обработки, jobId: ${jobId}`)
+
+      // Создаем задачу
+      jobs.set(jobId, {
+        status: 'processing',
+        progress: 0,
+        startTime: Date.now(),
+        fileName: req.file.originalname,
+        provider: provider
+      })
+
+      // Запускаем обработку в worker thread
+      const worker = new Worker(path.join(__dirname, 'csvWorker.js'), {
+        workerData: { filePath, provider, jobId }
+      })
+
+      worker.on('message', (message) => {
+        if (message.type === 'progress') {
+          const job = jobs.get(jobId)
+          if (job) {
+            job.progress = message.progress
+            job.currentStep = message.step
+            
+            // Отправляем прогресс через WebSocket
+            wss.clients.forEach(client => {
+              if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify({
+                  jobId,
+                  progress: message.progress,
+                  step: message.step
+                }))
+              }
+            })
+          }
+        } else if (message.type === 'complete') {
+          const job = jobs.get(jobId)
+          if (job) {
+            job.status = 'completed'
+            job.progress = 100
+            job.result = message.result
+            job.endTime = Date.now()
+            console.log(`✅ Задача ${jobId} завершена за ${job.endTime - job.startTime}мс`)
+          }
+        } else if (message.type === 'error') {
+          const job = jobs.get(jobId)
+          if (job) {
+            job.status = 'failed'
+            job.error = message.error
+            job.endTime = Date.now()
+            console.error(`❌ Задача ${jobId} завершилась с ошибкой:`, message.error)
+          }
+        }
+      })
+
+      worker.on('error', (error) => {
+        const job = jobs.get(jobId)
+        if (job) {
+          job.status = 'failed'
+          job.error = error.message
+          job.endTime = Date.now()
+        }
+        console.error(`❌ Worker error для ${jobId}:`, error)
+      })
+
+      // Очищаем файл после обработки
+      worker.on('exit', () => {
+        setTimeout(() => {
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath)
+            console.log(`🗑️ Удален временный файл: ${filePath}`)
+          }
+        }, 5000) // Удаляем через 5 секунд
+      })
+
+      res.json({ 
+        jobId,
+        message: 'Файл принят к обработке',
+        mode: 'server',
+        estimatedTime: `${Math.ceil(fileSizeMB / 10)} секунд`
+      })
+
+    } else {
+      // Клиентская обработка для небольших файлов
+      console.log(`🖥️ Клиентская обработка файла`)
+      
+      const csvData = []
+      const startTime = Date.now()
+
+      // Читаем и парсим CSV
+      await new Promise((resolve, reject) => {
+        fs.createReadStream(filePath)
+          .pipe(csv())
+          .on('data', (row) => {
+            csvData.push(row)
+          })
+          .on('end', resolve)
+          .on('error', reject)
+      })
+
+      // Нормализуем данные (используем упрощенную версию)
+      const normalizedData = csvData.map(row => ({
+        ...row,
+        provider: provider,
+        dataSource: provider === 'payshack' ? 'payshack' : 'merchant'
+      }))
+
+      // Вычисляем базовые метрики
+      const metrics = {
+        total: normalizedData.length,
+        provider: provider,
+        processingTime: Date.now() - startTime,
+        mode: 'client'
+      }
+
+      // Очищаем файл
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath)
+      }
+
+      res.json({
+        success: true,
+        data: normalizedData,
+        metrics: metrics,
+        mode: 'client'
+      })
+    }
+
+  } catch (error) {
+    console.error('❌ Ошибка обработки файла:', error)
+    
+    // Очищаем файл при ошибке
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path)
+    }
+    
+    res.status(500).json({ 
+      error: 'Ошибка обработки файла: ' + error.message 
+    })
+  }
+})
+
 // Запуск сервера
 app.listen(PORT, () => {
   console.log(`🚀 Analytics API сервер запущен на порту ${PORT}`)

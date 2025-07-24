@@ -56,64 +56,10 @@ function normalizeData(data, format, dataType = 'merchant') {
     // Нормализация для формата платформы
     console.log('🏦 Normalizing platform data:', data.length, 'records')
     
-    // Логируем первые несколько записей для анализа
     if (data.length > 0) {
       console.log('🔍 First platform record raw:', data[0])
     }
-    return data.map(row => ({
-      // Основные поля платформы
-      userId: row['User ID'] || '',
-      operationId: row['Operation ID'] || '',
-      status: row['Status'] || '',
-      foreignOperationId: row['Foreign Operation Id'] || '', // Ключевое поле для сверки
-      clientOperationId: row['Client Operation ID'] || '',
-      referenceId: row['Reference ID'] || '',
-      createdAt: row['Created At'] || '',
-      method: row['Method'] || '',
-      
-      // Суммы и валюты
-      initialAmount: parseFloat((row['Initial Amount'] || '0').replace(',', '.')) || 0,
-      initialCurrency: row['Initial Currency'] || 'TRY',
-      resultAmount: parseFloat((row['Result Amount'] || '0').replace(',', '.')) || 0,
-      resultCurrency: row['Result Currency'] || 'TRY',
-      
-      // Дополнительная информация
-      code: row['Code'] || '',
-      message: row['Message'] || '',
-      details: row['Details'] || '',
-      paymentChannelName: row['Payment Channel Name'] || '',
-      originalErrorMessage: row['Original Error Message'] || '',
-      endpoint: row['Endpoint'] || '',
-      
-      // Нормализованные поля для совместимости с системой
-      id: row['Foreign Operation Id'] || row['Operation ID'] || '', // Используем Foreign Operation Id как основной ID
-      trackingId: row['Foreign Operation Id'] || '', // Для сверки с провайдером
-      amount: parseFloat((row['Result Amount'] || row['Initial Amount'] || '0').replace(',', '.')) || 0,
-      currency: row['Result Currency'] || row['Initial Currency'] || 'TRY',
-      
-      // Дополнительные поля для отладки
-      debugInfo: {
-        hasForeignOpId: !!row['Foreign Operation Id'],
-        hasResultAmount: !!row['Result Amount'],
-        hasInitialAmount: !!row['Initial Amount'],
-        originalStatus: row['Status']
-      },
-      
-      // Тип операции (определяем из метода или суммы)
-      type: determineTransactionType(row['Method'], parseFloat((row['Result Amount'] || row['Initial Amount'] || '0').replace(',', '.'))),
-      transactionType: determineTransactionType(row['Method'], parseFloat((row['Result Amount'] || row['Initial Amount'] || '0').replace(',', '.'))),
-      
-      // Статус операции - нормализуем для сверки
-      normalizedStatus: normalizeStatus(row['Status'] || ''),
-      isCompleted: (row['Status'] || '').toLowerCase() === 'success',
-      isFailed: (row['Status'] || '').toLowerCase() === 'failed' || (row['Status'] || '').toLowerCase() === 'error',
-      
-      // Метаданные
-      dataSource: 'platform',
-      originalData: row // Сохраняем оригинальные данные для отладки
-    }))
     
-    // Логируем результат нормализации платформы
     const normalizedPlatform = data.map(row => ({
       // Основные поля платформы
       userId: row['User ID'] || '',
@@ -140,7 +86,7 @@ function normalizeData(data, format, dataType = 'merchant') {
       endpoint: row['Endpoint'] || '',
       
       // Нормализованные поля для совместимости с системой
-      id: row['Foreign Operation Id'] || row['Operation ID'] || '', // Используем Foreign Operation Id как основной ID
+      id: row['Foreign Operation Id'] || row['Operation ID'] || '',
       trackingId: row['Foreign Operation Id'] || '', // Для сверки с провайдером
       amount: parseFloat((row['Result Amount'] || row['Initial Amount'] || '0').replace(',', '.')) || 0,
       currency: row['Result Currency'] || row['Initial Currency'] || 'TRY',
@@ -174,16 +120,16 @@ function normalizeData(data, format, dataType = 'merchant') {
     console.log('🏦 - normalizedStatus:', normalizedPlatform[0]?.normalizedStatus)
     
     return normalizedPlatform
-  } else if (dataType === 'merchant') {
-    // Нормализация для формата провайдера
-    console.log('🏪 Normalizing merchant data:', data.length, 'records')
     
-    // Логируем первые несколько записей для анализа
+  } else if (dataType === 'merchant' || dataType === 'optipay') {
+    // Нормализация для формата провайдера Optipay
+    console.log('🏪 Normalizing Optipay merchant data:', data.length, 'records')
+    
     if (data.length > 0) {
-      console.log('🔍 First merchant record raw:', data[0])
+      console.log('🔍 First Optipay record raw:', data[0])
     }
     
-    const normalizedMerchant = data.map(row => ({
+    const normalizedOptipay = data.map(row => ({
       // Основные поля
       id: row['Tracking Id'] || row['Идентификатор отслеживания'] || row['Tracking ID'] || row['ID'] || '',
       status: row['Status'] || row['Статус'] || '',
@@ -228,7 +174,7 @@ function normalizeData(data, format, dataType = 'merchant') {
       isCanceled: (row['Status'] || row['Статус'] || '').toLowerCase() === 'canceled',
       isFailed: (row['Status'] || row['Статус'] || '').toLowerCase() === 'failed',
       
-      // Форматированные суммы (в TRY для всех типов)
+      // Форматированные суммы (в TRY для Optipay)
       amountFormatted: new Intl.NumberFormat('tr-TR', { 
         style: 'currency', 
         currency: 'TRY',
@@ -245,21 +191,22 @@ function normalizeData(data, format, dataType = 'merchant') {
       trackingId: row['Tracking Id'] || row['Идентификатор отслеживания'] || row['Tracking ID'] || row['ID'] || '',
       normalizedStatus: (row['Status'] || row['Статус'] || '').toLowerCase(),
       dataSource: 'merchant',
+      provider: 'optipay', // Добавляем провайдера
       originalData: row
     }))
     
-    console.log('🏪 Merchant normalization complete. Sample record:', normalizedMerchant[0])
+    console.log('🏪 Optipay normalization complete. Sample record:', normalizedOptipay[0])
     console.log('🏪 Key fields for reconciliation:')
-    console.log('🏪 - trackingId:', normalizedMerchant[0]?.trackingId)
-    console.log('🏪 - status:', normalizedMerchant[0]?.status)
-    console.log('🏪 - normalizedStatus:', normalizedMerchant[0]?.normalizedStatus)
+    console.log('🏪 - trackingId:', normalizedOptipay[0]?.trackingId)
+    console.log('🏪 - status:', normalizedOptipay[0]?.status)
+    console.log('🏪 - normalizedStatus:', normalizedOptipay[0]?.normalizedStatus)
     
-    return normalizedMerchant
+    return normalizedOptipay
+    
   } else if (dataType === 'payshack') {
     // Нормализация для формата Payshack
     console.log('🏪 Normalizing Payshack data:', data.length, 'records')
     
-    // Логируем первые несколько записей для анализа
     if (data.length > 0) {
       console.log('🔍 First Payshack record raw:', data[0])
     }
@@ -317,6 +264,7 @@ function normalizeData(data, format, dataType = 'merchant') {
     console.log('🏪 - normalizedStatus:', normalizedPayshack[0]?.normalizedStatus)
     
     return normalizedPayshack
+    
   } else {
     // Fallback для неизвестного типа данных
     console.log('⚠️ Unknown data type, using fallback normalization')

@@ -36,7 +36,7 @@ const Dashboard = ({
   const [timezone, setTimezone] = useState('UTC') // Добавляем поддержку часовых поясов
   const [selectedProvider, setSelectedProvider] = useState(null) // Добавляем состояние выбранного провайдера
   const [showProviderSelector, setShowProviderSelector] = useState(true) // Показываем селектор провайдера
-  const [processingMode, setProcessingMode] = useState('client') // 'client' или 'server'
+  const [processingMode, setProcessingMode] = useState('auto') // 'auto', 'client' или 'server'
   const [filters, setFilters] = useState({
     status: '',
     company: '',
@@ -87,6 +87,21 @@ const Dashboard = ({
     setAnomalies([])
   }
 
+  // Функция автоматического определения режима по размеру файла
+  const determineProcessingMode = (file) => {
+    const fileSizeMB = file.size / (1024 * 1024)
+    console.log(`📊 Размер файла: ${fileSizeMB.toFixed(2)}MB`)
+    
+    // Если файл больше 5MB или более 10,000 строк (примерно) - используем сервер
+    if (fileSizeMB > 5) {
+      console.log('🚀 Автоматически выбран серверный режим (файл > 5MB)')
+      return 'server'
+    } else {
+      console.log('🖥️ Автоматически выбран клиентский режим (файл <= 5MB)')
+      return 'client'
+    }
+  }
+
   // Обработка результатов с сервера
   const handleServerResults = (serverData) => {
     console.log('📊 Получены результаты с сервера:', serverData)
@@ -112,6 +127,70 @@ const Dashboard = ({
     setLoading(true)
     setError(null)
     
+    // Определяем режим обработки
+    let actualMode = processingMode
+    if (processingMode === 'auto') {
+      actualMode = determineProcessingMode(file)
+      console.log(`🎯 Автоматически выбран режим: ${actualMode}`)
+    }
+    
+    // Используем универсальный API сервис для всех режимов
+    const processWithUniversalAPI = async () => {
+      try {
+        const UniversalApiService = (await import('../utils/universalApiService.js')).default
+        const apiService = new UniversalApiService()
+        
+        const result = await apiService.processFile(
+          file, 
+          selectedProvider, 
+          actualMode, 
+          (progress) => {
+            console.log('📊 Прогресс обработки:', progress)
+            // Здесь можно добавить обновление UI с прогрессом
+          }
+        )
+        
+        console.log('✅ Обработка завершена:', result)
+        
+        if (result.data) {
+          // Обрабатываем данные как в клиентском режиме
+          setData(result.data)
+          setFilteredData(result.data)
+          
+          // Вычисляем метрики
+          if (result.metrics) {
+            setMetrics(result.metrics)
+          } else {
+            const { default: calculateMetrics } = await import('../utils/analytics.js')
+            const calculatedMetrics = calculateMetrics(result.data, selectedProvider)
+            setMetrics(calculatedMetrics)
+          }
+          
+          // Определяем тип данных
+          const detectedType = selectedProvider === 'payshack' ? 'payshack' : 'merchant'
+          setDataType(detectedType)
+          
+          console.log('✅ Данные установлены:', {
+            dataLength: result.data.length,
+            mode: result.mode || actualMode,
+            provider: selectedProvider
+          })
+        }
+        
+        setLoading(false)
+        
+      } catch (error) {
+        console.error('❌ Ошибка универсальной обработки:', error)
+        setError(`Ошибка обработки: ${error.message}`)
+        setLoading(false)
+      }
+    }
+    
+    // Запускаем универсальную обработку
+    processWithUniversalAPI()
+    return
+    
+    // Клиентская обработка
     const reader = new FileReader()
     reader.onload = (e) => {
       try {
@@ -399,6 +478,16 @@ const Dashboard = ({
               <span className="text-white font-medium">Режим обработки:</span>
               <div className="flex bg-white/10 rounded-lg p-1">
                 <button
+                  onClick={() => setProcessingMode('auto')}
+                  className={`px-4 py-2 rounded-md transition-all ${
+                    processingMode === 'auto'
+                      ? 'bg-green-500 text-white shadow-lg'
+                      : 'text-white/70 hover:text-white'
+                  }`}
+                >
+                  🎯 Авто
+                </button>
+                <button
                   onClick={() => setProcessingMode('client')}
                   className={`px-4 py-2 rounded-md transition-all ${
                     processingMode === 'client'
@@ -422,22 +511,24 @@ const Dashboard = ({
             </div>
             <div className="text-center mt-2">
               <p className="text-white/60 text-sm">
-                {processingMode === 'client' 
-                  ? 'Обработка в браузере (до 10,000 записей)'
-                  : 'Серверная обработка (без ограничений, WebSocket прогресс)'
+                {processingMode === 'auto' 
+                  ? 'Автоматический выбор (файлы >5MB → сервер, ≤5MB → браузер)'
+                  : processingMode === 'client' 
+                    ? 'Обработка в браузере (до 10,000 записей)'
+                    : 'Серверная обработка (без ограничений, WebSocket прогресс)'
                 }
               </p>
             </div>
           </div>
 
-          {/* Загрузка файла */}
-          {processingMode === 'client' ? (
-            <FileUpload onFileUpload={handleFileUpload} loading={loading} />
-          ) : (
-            <BigFileProcessor 
+                    {/* Загрузка файла */}
+          {processingMode === 'server' ? (
+            <BigFileProcessor
               selectedProvider={{ id: selectedProvider, name: selectedProvider === 'optipay' ? 'Optipay' : 'Payshack' }}
               onResults={handleServerResults}
             />
+          ) : (
+            <FileUpload onFileUpload={handleFileUpload} loading={loading} />
           )}
           
           {/* Кнопка возврата к выбору провайдера */}
