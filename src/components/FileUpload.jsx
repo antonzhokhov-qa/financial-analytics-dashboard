@@ -1,17 +1,18 @@
 import { useState, useRef } from 'react'
-import { Upload, FileText, AlertCircle, CheckCircle } from 'lucide-react'
+import { Upload, File, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
 
-const FileUpload = ({ onFileUpload, loading }) => {
+const FileUpload = ({ onFileUpload, loading, maxSizeMB = 50 }) => {
   const [dragActive, setDragActive] = useState(false)
-  const [selectedFile, setSelectedFile] = useState(null)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [processingStage, setProcessingStage] = useState('')
   const fileInputRef = useRef(null)
 
   const handleDrag = (e) => {
     e.preventDefault()
     e.stopPropagation()
-    if (e.type === "dragenter" || e.type === "dragover") {
+    if (e.type === 'dragenter' || e.type === 'dragover') {
       setDragActive(true)
-    } else if (e.type === "dragleave") {
+    } else if (e.type === 'dragleave') {
       setDragActive(false)
     }
   }
@@ -20,42 +21,96 @@ const FileUpload = ({ onFileUpload, loading }) => {
     e.preventDefault()
     e.stopPropagation()
     setDragActive(false)
-    
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0]
-      handleFileSelect(file)
+      handleFile(e.dataTransfer.files[0])
     }
   }
 
-  const handleFileSelect = (file) => {
-    // Проверяем расширение файла - только CSV
+  const handleChange = (e) => {
+    e.preventDefault()
+    if (e.target.files && e.target.files[0]) {
+      handleFile(e.target.files[0])
+    }
+  }
+
+  const handleFile = (file) => {
+    console.log('📁 File selected:', file.name, 'Size:', (file.size / 1024 / 1024).toFixed(2), 'MB')
+    
+    // Проверка размера файла
+    const fileSizeMB = file.size / 1024 / 1024
+    if (fileSizeMB > maxSizeMB) {
+      alert(`Файл слишком большой! Максимальный размер: ${maxSizeMB}MB, размер файла: ${fileSizeMB.toFixed(2)}MB`)
+      return
+    }
+
+    // Проверка типа файла
     if (!file.name.toLowerCase().endsWith('.csv')) {
       alert('Пожалуйста, выберите CSV файл')
       return
     }
+
+    // Симуляция прогресса загрузки
+    setUploadProgress(0)
+    setProcessingStage('Загрузка файла...')
     
-    setSelectedFile(file)
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 90) {
+          clearInterval(progressInterval)
+          setProcessingStage('Обработка данных...')
+          return 90
+        }
+        return prev + 10
+      })
+    }, 100)
+
     onFileUpload(file)
   }
 
-  const handleFileInput = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      handleFileSelect(e.target.files[0])
-    }
+  const onButtonClick = () => {
+    fileInputRef.current?.click()
   }
 
-  const handleButtonClick = () => {
-    fileInputRef.current?.click()
+  // Обновляем прогресс когда загрузка завершена
+  if (loading && uploadProgress < 100) {
+    setUploadProgress(100)
+    setProcessingStage('Анализ данных...')
+  } else if (!loading && uploadProgress > 0) {
+    setUploadProgress(0)
+    setProcessingStage('')
   }
 
   return (
     <div className="w-full max-w-2xl mx-auto">
+      {/* Прогресс-бар */}
+      {(loading || uploadProgress > 0) && (
+        <div className="mb-6 bg-white/10 backdrop-blur-xl rounded-xl p-4 border border-white/20">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-white font-medium">{processingStage}</span>
+            <span className="text-white/70">{uploadProgress}%</span>
+          </div>
+          <div className="w-full bg-white/20 rounded-full h-2">
+            <div 
+              className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${uploadProgress}%` }}
+            />
+          </div>
+          {loading && (
+            <div className="flex items-center justify-center mt-3">
+              <Loader2 className="h-5 w-5 text-white animate-spin mr-2" />
+              <span className="text-white/70">Обработка может занять некоторое время для больших файлов...</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Зона загрузки */}
       <div
-        className={`relative border-2 border-dashed rounded-2xl p-8 transition-all duration-300 ${
-          dragActive 
-            ? 'border-blue-400 bg-blue-500/10' 
-            : 'border-white/20 bg-white/5 hover:bg-white/10'
-        }`}
+        className={`relative border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-300 ${
+          dragActive
+            ? 'border-blue-400 bg-blue-500/10'
+            : 'border-white/30 bg-white/5 hover:bg-white/10'
+        } ${loading ? 'opacity-50 pointer-events-none' : ''}`}
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
         onDragOver={handleDrag}
@@ -65,95 +120,54 @@ const FileUpload = ({ onFileUpload, loading }) => {
           ref={fileInputRef}
           type="file"
           accept=".csv"
-          onChange={handleFileInput}
+          onChange={handleChange}
           className="hidden"
+          disabled={loading}
         />
-        
-        <div className="text-center space-y-4">
-          {/* Иконка */}
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto">
+
+        <div className="space-y-4">
+          <div className="flex justify-center">
             {loading ? (
-              <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            ) : selectedFile ? (
-              <CheckCircle className="w-8 h-8 text-white" />
+              <Loader2 className="h-16 w-16 text-blue-400 animate-spin" />
             ) : (
-              <Upload className="w-8 h-8 text-white" />
+              <Upload className="h-16 w-16 text-white/70" />
             )}
           </div>
-          
-          {/* Заголовок */}
+
           <div>
             <h3 className="text-xl font-semibold text-white mb-2">
-              {loading ? 'Обработка файла...' : 
-               selectedFile ? 'Файл загружен' : 
-               'Загрузите CSV файл'}
+              {loading ? 'Обработка файла...' : 'Загрузите CSV файл'}
             </h3>
-            <p className="text-gray-300">
-              {loading ? 'Пожалуйста, подождите...' :
-               selectedFile ? selectedFile.name :
-               'Перетащите файл сюда или нажмите кнопку'}
+            <p className="text-white/70">
+              Перетащите файл сюда или нажмите для выбора
+            </p>
+            <p className="text-white/50 text-sm mt-2">
+              Максимальный размер: {maxSizeMB}MB • Поддерживаемые форматы: CSV
             </p>
           </div>
-          
-          {/* Кнопка загрузки */}
-          {!selectedFile && !loading && (
+
+          {!loading && (
             <button
-              onClick={handleButtonClick}
-              className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-200 font-semibold"
+              onClick={onButtonClick}
+              className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-200 font-medium"
             >
-              Выбрать CSV файл
+              <File className="h-5 w-5 mr-2" />
+              Выбрать файл
             </button>
           )}
-          
-          {/* Информация о поддерживаемых форматах */}
-          {!selectedFile && !loading && (
-            <div className="mt-6 p-4 bg-white/5 rounded-xl">
-              <h4 className="text-sm font-semibold text-white mb-2">Поддерживаемые форматы:</h4>
-              <div className="flex items-center justify-center space-x-2 text-sm text-gray-300">
-                <FileText className="w-4 h-4 text-blue-400" />
-                <span>CSV файлы (.csv)</span>
-              </div>
-            </div>
-          )}
-          
-          {/* Статус загрузки */}
-          {loading && (
-            <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-              <div className="flex items-center space-x-3">
-                <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
-                <span className="text-blue-300">Анализируем данные...</span>
-              </div>
-            </div>
-          )}
-          
-          {/* Успешная загрузка */}
-          {selectedFile && !loading && (
-            <div className="mt-4 p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
-              <div className="flex items-center space-x-3">
-                <CheckCircle className="w-5 h-5 text-green-400" />
-                <div>
-                  <span className="text-green-300 font-medium">Файл успешно загружен</span>
-                  <p className="text-green-300/70 text-sm">{selectedFile.name}</p>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
-      </div>
-      
-      {/* Подсказки */}
-      <div className="mt-6 space-y-3">
-        <div className="flex items-start space-x-3 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
-          <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5" />
-          <div className="text-sm text-yellow-300">
-            <p className="font-medium mb-1">Важно:</p>
-            <ul className="space-y-1">
-              <li>• Файл должен быть в формате CSV</li>
-              <li>• Файл должен содержать заголовки в первой строке</li>
-              <li>• Поддерживаются разделители: запятая (,), точка с запятой (;)</li>
-              <li>• Максимальный размер файла: 10 МБ</li>
-            </ul>
-          </div>
+
+        {/* Подсказки для больших файлов */}
+        <div className="mt-6 text-left bg-white/5 rounded-lg p-4">
+          <h4 className="text-white font-medium mb-2 flex items-center">
+            <AlertCircle className="h-4 w-4 mr-2 text-yellow-400" />
+            Работа с большими файлами:
+          </h4>
+          <ul className="text-white/70 text-sm space-y-1">
+            <li>• Файлы более 10,000 записей обрабатываются частично</li>
+            <li>• Для полного анализа больших файлов рекомендуется использовать API</li>
+            <li>• Обработка может занимать до 30 секунд</li>
+          </ul>
         </div>
       </div>
     </div>

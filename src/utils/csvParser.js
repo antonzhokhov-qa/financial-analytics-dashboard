@@ -231,12 +231,14 @@ function normalizeData(data, format, dataType = 'merchant') {
       // Форматированные суммы (в TRY для всех типов)
       amountFormatted: new Intl.NumberFormat('tr-TR', { 
         style: 'currency', 
-        currency: 'TRY' 
+        currency: 'TRY',
+        maximumFractionDigits: 2
       }).format(parseFloat((row['Amount'] || row['Transaction amount'] || row['Сумма транзакции'] || row['Сумма'] || '0').replace(',', '.')) || 0),
       
       feeFormatted: new Intl.NumberFormat('tr-TR', { 
         style: 'currency', 
-        currency: 'TRY' 
+        currency: 'TRY',
+        maximumFractionDigits: 2
       }).format(parseFloat((row['Fee'] || row['Комиссия'] || '0').replace(',', '.')) || 0),
       
       // Дополнительные поля для сверки
@@ -293,7 +295,8 @@ function normalizeData(data, format, dataType = 'merchant') {
       // Форматированные суммы (в INR для Payshack)
       amountFormatted: new Intl.NumberFormat('en-IN', { 
         style: 'currency', 
-        currency: 'INR' 
+        currency: 'INR',
+        maximumFractionDigits: 2
       }).format(parseFloat((row['Amount'] || '0').replace(',', '.')) || 0),
       
       // Дополнительные поля для совместимости
@@ -486,6 +489,12 @@ export function parseCSV(text, dataType = null) {
     
     console.log('Final data type:', finalDataType)
     
+    // Ограничиваем количество записей для больших файлов
+    const maxRecords = 10000 // Максимум 10,000 записей для производительности
+    const maxLines = Math.min(lines.length, maxRecords + 1) // +1 для заголовка
+    
+    console.log(`📊 Processing ${maxLines - 1} records from ${lines.length - 1} total (limited for performance)`)
+    
     const data = []
     
     // Специальная обработка для файла платформы с неправильной структурой
@@ -606,7 +615,7 @@ export function parseCSV(text, dataType = null) {
       // Альтернативная обработка для файла платформы с нормальной структурой
       console.log('🔧 Processing platform file with normal structure...')
       
-      for (let i = 1; i < lines.length; i++) {
+      for (let i = 1; i < maxLines; i++) {
         const line = lines[i].trim()
         if (!line) continue
         
@@ -621,9 +630,14 @@ export function parseCSV(text, dataType = null) {
       }
       
       console.log('Processed platform records:', data.length)
+      if (lines.length > maxLines) {
+        console.log(`⚠️ Platform file truncated: processed ${data.length} records from ${lines.length - 1} total`)
+      }
     } else {
       // Стандартная обработка для нормальных CSV файлов
-      for (let i = 1; i < lines.length; i++) {
+      console.log('🔧 Processing standard CSV file...')
+      
+      for (let i = 1; i < maxLines; i++) {
         const line = lines[i].trim()
         if (!line) continue
         
@@ -635,6 +649,10 @@ export function parseCSV(text, dataType = null) {
         })
         
         data.push(row)
+      }
+      
+      if (lines.length > maxLines) {
+        console.log(`⚠️ File truncated: processed ${data.length} records from ${lines.length - 1} total`)
       }
     }
     

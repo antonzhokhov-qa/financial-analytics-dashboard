@@ -1,21 +1,62 @@
 export function calculateMetrics(data, dataType = 'merchant') {
   console.log('Calculating metrics for data:', data.length, 'rows, type:', dataType)
   
+  // Определяем провайдера по структуре данных
+  const provider = data.length > 0 ? (data[0].provider || 'optipay') : 'optipay'
+  console.log('Detected provider:', provider)
+  
   const total = data.length
-  const successful = data.filter(row => {
-    const status = row.status ? row.status.toLowerCase() : ''
-    return dataType === 'merchant' ? status === 'completed' : status === 'success'
-  }).length
   
-  const failed = data.filter(row => {
+  // Универсальная функция для определения успешных транзакций
+  const isSuccessful = (row) => {
     const status = row.status ? row.status.toLowerCase() : ''
-    return dataType === 'merchant' ? status === 'failed' : status === 'fail'
-  }).length
+    if (provider === 'payshack') {
+      return status === 'success'
+    } else if (dataType === 'platform') {
+      return status === 'success'
+    } else {
+      return status === 'completed'
+    }
+  }
   
-  const canceled = data.filter(row => {
+  // Универсальная функция для определения неуспешных транзакций
+  const isFailed = (row) => {
     const status = row.status ? row.status.toLowerCase() : ''
-    return dataType === 'merchant' ? status === 'canceled' : false
-  }).length
+    if (provider === 'payshack') {
+      return status === 'failed'
+    } else if (dataType === 'platform') {
+      return status === 'failed' || status === 'fail'
+    } else {
+      return status === 'failed'
+    }
+  }
+  
+  // Универсальная функция для определения отмененных транзакций
+  const isCanceled = (row) => {
+    const status = row.status ? row.status.toLowerCase() : ''
+    if (provider === 'payshack') {
+      return false // У Payshack нет статуса "canceled"
+    } else {
+      return status === 'canceled'
+    }
+  }
+  
+  // Функция для определения ожидающих транзакций
+  const isPending = (row) => {
+    const status = row.status ? row.status.toLowerCase() : ''
+    if (provider === 'payshack') {
+      return status === 'initiated' || status === 'pending'
+    } else if (dataType === 'platform') {
+      return status === 'in progress' || status === 'pending'
+    } else {
+      return status === 'pending'
+    }
+  }
+  
+  const successful = data.filter(isSuccessful).length
+  const failed = data.filter(isFailed).length
+  const canceled = data.filter(isCanceled).length
+  const pending = data.filter(isPending).length
 
   // Анализ по типам транзакций
   const deposits = data.filter(row => row.isDeposit)
@@ -23,31 +64,19 @@ export function calculateMetrics(data, dataType = 'merchant') {
   
   const depositMetrics = {
     total: deposits.length,
-    successful: deposits.filter(row => {
-      const status = row.status ? row.status.toLowerCase() : ''
-      return dataType === 'merchant' ? status === 'completed' : status === 'success'
-    }).length,
+    successful: deposits.filter(isSuccessful).length,
     amount: deposits.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0),
     successfulAmount: deposits
-      .filter(row => {
-        const status = row.status ? row.status.toLowerCase() : ''
-        return dataType === 'merchant' ? status === 'completed' : status === 'success'
-      })
+      .filter(isSuccessful)
       .reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0)
   }
   
   const withdrawalMetrics = {
     total: withdrawals.length,
-    successful: withdrawals.filter(row => {
-      const status = row.status ? row.status.toLowerCase() : ''
-      return dataType === 'merchant' ? status === 'completed' : status === 'success'
-    }).length,
+    successful: withdrawals.filter(isSuccessful).length,
     amount: withdrawals.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0),
     successfulAmount: withdrawals
-      .filter(row => {
-        const status = row.status ? row.status.toLowerCase() : ''
-        return dataType === 'merchant' ? status === 'completed' : status === 'success'
-      })
+      .filter(isSuccessful)
       .reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0)
   }
   
@@ -65,10 +94,7 @@ export function calculateMetrics(data, dataType = 'merchant') {
   const conversionRate = total > 0 ? (successful / total) * 100 : 0
   
   const successfulRevenue = data
-    .filter(row => {
-      const status = row.status ? row.status.toLowerCase() : ''
-      return dataType === 'merchant' ? status === 'completed' : status === 'success'
-    })
+    .filter(isSuccessful)
     .reduce((sum, row) => {
       const amount = parseFloat(row.amount) || 0
       return sum + amount
@@ -80,14 +106,14 @@ export function calculateMetrics(data, dataType = 'merchant') {
   }, 0)
   
   const lostRevenue = data
-    .filter(row => {
-      const status = row.status ? row.status.toLowerCase() : ''
-      if (dataType === 'merchant') {
-        return status === 'failed' || status === 'canceled'
-      } else {
-        return status === 'fail'
-      }
-    })
+    .filter(row => isFailed(row) || isCanceled(row))
+    .reduce((sum, row) => {
+      const amount = parseFloat(row.amount) || 0
+      return sum + amount
+    }, 0)
+  
+  const pendingRevenue = data
+    .filter(isPending)
     .reduce((sum, row) => {
       const amount = parseFloat(row.amount) || 0
       return sum + amount
@@ -110,15 +136,15 @@ export function calculateMetrics(data, dataType = 'merchant') {
     data.forEach(row => {
       const company = row.company || 'Unknown'
       if (!companyStats[company]) {
-        companyStats[company] = { total: 0, completed: 0, failed: 0, canceled: 0, revenue: 0 }
+        companyStats[company] = { total: 0, completed: 0, failed: 0, canceled: 0, pending: 0, revenue: 0 }
       }
       companyStats[company].total++
       companyStats[company].revenue += parseFloat(row.amount) || 0
       
-      const status = row.status ? row.status.toLowerCase() : ''
-      if (status === 'completed') companyStats[company].completed++
-      else if (status === 'failed') companyStats[company].failed++
-      else if (status === 'canceled') companyStats[company].canceled++
+      if (isSuccessful(row)) companyStats[company].completed++
+      else if (isFailed(row)) companyStats[company].failed++
+      else if (isCanceled(row)) companyStats[company].canceled++
+      else if (isPending(row)) companyStats[company].pending++
     })
   }
   
@@ -127,19 +153,14 @@ export function calculateMetrics(data, dataType = 'merchant') {
   data.forEach(row => {
     const method = row.paymentMethod || 'Unknown'
     if (!paymentMethodStats[method]) {
-      paymentMethodStats[method] = { total: 0, completed: 0, failed: 0, canceled: 0 }
+      paymentMethodStats[method] = { total: 0, completed: 0, failed: 0, canceled: 0, pending: 0 }
     }
     paymentMethodStats[method].total++
     
-    const status = row.status ? row.status.toLowerCase() : ''
-    if (dataType === 'merchant') {
-      if (status === 'completed') paymentMethodStats[method].completed++
-      else if (status === 'failed') paymentMethodStats[method].failed++
-      else if (status === 'canceled') paymentMethodStats[method].canceled++
-    } else {
-      if (status === 'success') paymentMethodStats[method].completed++
-      else if (status === 'fail') paymentMethodStats[method].failed++
-    }
+    if (isSuccessful(row)) paymentMethodStats[method].completed++
+    else if (isFailed(row)) paymentMethodStats[method].failed++
+    else if (isCanceled(row)) paymentMethodStats[method].canceled++
+    else if (isPending(row)) paymentMethodStats[method].pending++
   })
   
   const metrics = {
@@ -147,9 +168,11 @@ export function calculateMetrics(data, dataType = 'merchant') {
     successful,
     failed,
     canceled,
+    pending,
     conversionRate,
     successfulRevenue,
     lostRevenue,
+    pendingRevenue,
     totalAmount,
     totalFees,
     averageAmount,
@@ -159,7 +182,8 @@ export function calculateMetrics(data, dataType = 'merchant') {
     paymentMethodStats,
     depositMetrics,
     withdrawalMetrics,
-    dataType
+    dataType,
+    provider
   }
   
   console.log('Calculated metrics:', metrics)
