@@ -16,7 +16,6 @@ const EnhancedDataTable = ({ data }) => {
     currency: '',
     search: ''
   })
-  const [filteredData, setFilteredData] = useState(data)
   const [metrics, setMetrics] = useState(null)
 
   // Вычисляем метрики с поддержкой мультивалютности
@@ -99,22 +98,20 @@ const EnhancedDataTable = ({ data }) => {
   }
 
   // Фильтрация и поиск
-  const filteredData = data.filter(row => {
+  const searchFilteredData = data.filter(row => {
     const searchLower = searchTerm.toLowerCase()
     return (
       (row.id && row.id.toString().toLowerCase().includes(searchLower)) ||
       (row.referenceId && row.referenceId.toLowerCase().includes(searchLower)) ||
       (row.clientOperationId && row.clientOperationId.toLowerCase().includes(searchLower)) ||
-      (row.status && row.status.toLowerCase().includes(searchLower)) ||
       (row.project && row.project.toLowerCase().includes(searchLower)) ||
-      (row.userId && row.userId.toString().toLowerCase().includes(searchLower)) ||
-      (row.paymentMethodCode && row.paymentMethodCode.toLowerCase().includes(searchLower)) ||
-      (row.amount && row.amount.toString().includes(searchLower))
+      (row.status && row.status.toLowerCase().includes(searchLower)) ||
+      (row.currency && row.currency.toLowerCase().includes(searchLower))
     )
   })
 
   // Сортировка
-  const sortedData = [...filteredData].sort((a, b) => {
+  const sortedData = [...searchFilteredData].sort((a, b) => {
     if (!sortConfig.key) return 0
 
     const aValue = a[sortConfig.key] || ''
@@ -137,9 +134,10 @@ const EnhancedDataTable = ({ data }) => {
   })
 
   // Пагинация
-  const totalPages = Math.ceil(sortedData.length / itemsPerPage)
+  const totalPages = Math.ceil(searchFilteredData.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
-  const currentData = sortedData.slice(startIndex, startIndex + itemsPerPage)
+  const endIndex = startIndex + itemsPerPage
+  const currentData = sortedData.slice(startIndex, endIndex)
 
   const handleSort = (key) => {
     setSortConfig(prev => ({
@@ -181,7 +179,7 @@ const EnhancedDataTable = ({ data }) => {
         <div>
           <h2 className="text-2xl font-bold text-white">Расширенные данные API</h2>
           <p className="text-gray-300">
-            {filteredData.length} операций из {data.length} • Поддержка криптовалют и детальной информации
+            {searchFilteredData.length} операций из {data.length} • Поддержка криптовалют и детальной информации
           </p>
         </div>
         
@@ -220,7 +218,7 @@ const EnhancedDataTable = ({ data }) => {
           <div className="flex items-center space-x-2">
             <Filter className="w-4 h-4 text-gray-400" />
             <span className="text-sm text-gray-400">
-              {filteredData.length} результатов
+              {searchFilteredData.length} результатов
             </span>
           </div>
           
@@ -563,7 +561,7 @@ const EnhancedDataTable = ({ data }) => {
         {totalPages > 1 && (
           <div className="bg-white/5 px-6 py-4 flex items-center justify-between border-t border-white/10">
             <div className="text-sm text-gray-400">
-              Страница {currentPage} из {totalPages} • Показано {currentData.length} из {filteredData.length}
+              Страница {currentPage} из {totalPages} • Показано {currentData.length} из {searchFilteredData.length}
             </div>
             <div className="flex items-center space-x-2">
               <button
