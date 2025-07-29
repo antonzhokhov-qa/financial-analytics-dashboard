@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown, DollarSign, Users, Activity, AlertTriangle, CheckCircle, XCircle, Clock } from 'lucide-react'
+import { TrendingUp, TrendingDown, DollarSign, Users, Activity, AlertTriangle, CheckCircle, XCircle, Clock, Globe, Building } from 'lucide-react'
 
 const MetricsGrid = ({ metrics, dataType = 'merchant', selectedProvider = null }) => {
   if (!metrics) return null
@@ -7,6 +7,8 @@ const MetricsGrid = ({ metrics, dataType = 'merchant', selectedProvider = null }
   console.log('🔍 MetricsGrid получил метрики:', metrics)
   console.log('🔍 MetricsGrid dataType:', dataType)
   console.log('🔍 MetricsGrid selectedProvider:', selectedProvider)
+  console.log('🔍 MetricsGrid currencyBreakdown:', metrics.currencyBreakdown)
+  console.log('🔍 MetricsGrid merchantBreakdown:', metrics.merchantBreakdown)
 
   // Правильное определение валюты на основе провайдера и данных
   const getCurrency = () => {
@@ -24,6 +26,18 @@ const MetricsGrid = ({ metrics, dataType = 'merchant', selectedProvider = null }
   console.log('💰 Определенная валюта:', currency, 'для провайдера:', selectedProvider || metrics.provider)
   
   const sourceName = dataType === 'merchant' ? 'провайдера' : 'платформы'
+
+  // Проверяем есть ли мультивалютность
+  const isMultiCurrency = metrics.currencyBreakdown && metrics.currencyBreakdown.length > 1
+  const hasCurrencyBreakdown = metrics.currencyBreakdown && metrics.currencyBreakdown.length > 0
+  const hasMerchantBreakdown = metrics.merchantBreakdown && metrics.merchantBreakdown.length > 0
+
+  console.log('🌍 Мультивалютность:', {
+    isMultiCurrency,
+    hasCurrencyBreakdown,
+    currencyCount: metrics.currencyBreakdown?.length || 0,
+    merchantCount: metrics.merchantBreakdown?.length || 0
+  })
 
   // Улучшенная функция форматирования валют с автоматическим определением
   const formatCurrency = (amount, currencyCode = 'TRY') => {
@@ -125,9 +139,13 @@ const MetricsGrid = ({ metrics, dataType = 'merchant', selectedProvider = null }
       borderColor: 'border-yellow-500/30'
     },
     {
-      title: 'Общая выручка',
-      value: formatCurrency(metrics.successfulRevenue),
-      subtitle: 'Только успешные операции',
+      title: isMultiCurrency ? 'Общая выручка (все валюты)' : 'Общая выручка',
+      value: isMultiCurrency ? 
+        `${metrics.currencyBreakdown.length} валют` : 
+        formatCurrency(metrics.successfulRevenue),
+      subtitle: isMultiCurrency ? 
+        'Смотрите детальную разбивку ниже' : 
+        'Только успешные операции',
       icon: DollarSign,
       color: 'from-emerald-500 to-teal-500',
       bgColor: 'bg-emerald-500/20',
@@ -135,7 +153,9 @@ const MetricsGrid = ({ metrics, dataType = 'merchant', selectedProvider = null }
     },
     {
       title: 'Потерянная выручка',
-      value: formatCurrency(metrics.lostRevenue || 0),
+      value: isMultiCurrency ? 
+        `${metrics.currencyBreakdown.reduce((total, curr) => total + (curr.lostRevenue || 0), 0).toLocaleString()} всего` :
+        formatCurrency(metrics.lostRevenue || 0),
       subtitle: 'Неудачные и отмененные',
       icon: TrendingDown,
       color: 'from-red-500 to-rose-500',
@@ -143,9 +163,13 @@ const MetricsGrid = ({ metrics, dataType = 'merchant', selectedProvider = null }
       borderColor: 'border-red-500/30'
     },
     {
-      title: 'Общая сумма',
-      value: formatCurrency(metrics.totalAmount || metrics.totalRevenue || 0),
-      subtitle: 'Все операции',
+      title: isMultiCurrency ? 'Общая сумма (все валюты)' : 'Общая сумма',
+      value: isMultiCurrency ?
+        `${metrics.currencyBreakdown.length} валют` :
+        formatCurrency(metrics.totalAmount || metrics.totalRevenue || 0),
+      subtitle: isMultiCurrency ? 
+        'Смотрите детальную разбивку ниже' :
+        'Все операции',
       icon: DollarSign,
       color: 'from-purple-500 to-indigo-500',
       bgColor: 'bg-purple-500/20',
@@ -171,14 +195,17 @@ const MetricsGrid = ({ metrics, dataType = 'merchant', selectedProvider = null }
     },
     {
       title: 'Средняя сумма',
-      value: formatCurrency(metrics.averageAmount),
-      subtitle: 'Среднее по всем операциям',
+      value: isMultiCurrency ? 
+        'По валютам' :
+        formatCurrency(metrics.averageAmount),
+      subtitle: isMultiCurrency ?
+        'Смотрите детальную разбивку ниже' :
+        'Среднее по всем операциям',
       icon: TrendingUp,
       color: 'from-cyan-500 to-blue-500',
       bgColor: 'bg-cyan-500/20',
       borderColor: 'border-cyan-500/30'
     },
-
   ]
 
   // Фильтруем метрики в зависимости от типа данных
@@ -191,7 +218,12 @@ const MetricsGrid = ({ metrics, dataType = 'merchant', selectedProvider = null }
         <div>
           <h2 className="text-2xl font-bold text-white">Ключевые метрики</h2>
           <p className="text-gray-300">
-            Основные показатели по {sourceName} • Валюта: {currency}
+            Основные показатели по {sourceName} • 
+            {isMultiCurrency ? 
+              ` ${metrics.currencyBreakdown.length} валют` : 
+              ` Валюта: ${currency}`
+            }
+            {hasMerchantBreakdown && ` • ${metrics.merchantBreakdown.length} мерчантов`}
           </p>
         </div>
         <div className="flex items-center space-x-2 px-3 py-1 bg-white/10 rounded-full">
@@ -225,6 +257,129 @@ const MetricsGrid = ({ metrics, dataType = 'merchant', selectedProvider = null }
           </div>
         ))}
       </div>
+
+      {/* Детальная разбивка по валютам */}
+      {hasCurrencyBreakdown && (
+        <div className="mt-8">
+          <div className="flex items-center space-x-3 mb-6">
+            <Globe className="w-6 h-6 text-blue-400" />
+            <h3 className="text-xl font-bold text-white">Разбивка по валютам</h3>
+            <span className="px-2 py-1 bg-blue-500/20 text-blue-300 text-sm rounded-full">
+              {metrics.currencyBreakdown.length} валют
+            </span>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {metrics.currencyBreakdown.map((currencyData, index) => (
+              <div
+                key={index}
+                className="bg-white/5 backdrop-blur-xl rounded-xl p-4 border border-white/10 hover:bg-white/10 transition-all duration-300"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-lg font-bold text-white">{currencyData.currency}</span>
+                  <span className="text-sm text-gray-400">{currencyData.conversionRate}</span>
+                </div>
+                
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Операций:</span>
+                    <span className="text-white font-medium">{currencyData.total.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Успешных:</span>
+                    <span className="text-green-400 font-medium">{currencyData.successful.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Общая сумма:</span>
+                    <span className="text-white font-medium">
+                      {formatCurrency(currencyData.totalAmount, currencyData.currency)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Выручка:</span>
+                    <span className="text-green-400 font-medium">
+                      {formatCurrency(currencyData.successfulRevenue, currencyData.currency)}
+                    </span>
+                  </div>
+                  {currencyData.merchants && currencyData.merchants.length > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-300">Мерчантов:</span>
+                      <span className="text-blue-400 font-medium">{currencyData.merchants.length}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Детальная разбивка по мерчантам */}
+      {hasMerchantBreakdown && (
+        <div className="mt-8">
+          <div className="flex items-center space-x-3 mb-6">
+            <Building className="w-6 h-6 text-purple-400" />
+            <h3 className="text-xl font-bold text-white">Разбивка по мерчантам</h3>
+            <span className="px-2 py-1 bg-purple-500/20 text-purple-300 text-sm rounded-full">
+              {metrics.merchantBreakdown.length} мерчантов
+            </span>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {metrics.merchantBreakdown.map((merchantData, index) => (
+              <div
+                key={index}
+                className="bg-white/5 backdrop-blur-xl rounded-xl p-4 border border-white/10 hover:bg-white/10 transition-all duration-300"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-lg font-bold text-white capitalize">{merchantData.merchant}</span>
+                  <span className="text-sm text-gray-400">{merchantData.conversionRate}</span>
+                </div>
+                
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Операций:</span>
+                    <span className="text-white font-medium">{merchantData.total.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Успешных:</span>
+                    <span className="text-green-400 font-medium">{merchantData.successful.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Общая сумма:</span>
+                    <span className="text-white font-medium">
+                      {merchantData.currencies.length > 1 ? 
+                        `${merchantData.currencies.length} валют` :
+                        formatCurrency(merchantData.totalAmount, merchantData.currencies[0])
+                      }
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Выручка:</span>
+                    <span className="text-green-400 font-medium">
+                      {merchantData.currencies.length > 1 ? 
+                        `${merchantData.currencies.length} валют` :
+                        formatCurrency(merchantData.successfulRevenue, merchantData.currencies[0])
+                      }
+                    </span>
+                  </div>
+                  {merchantData.currencies && merchantData.currencies.length > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-300">Валюты:</span>
+                      <span className="text-blue-400 font-medium">
+                        {merchantData.currencies.length > 2 ? 
+                          `${merchantData.currencies.slice(0, 2).join(', ')}...` :
+                          merchantData.currencies.join(', ')
+                        }
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Дополнительная информация */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
