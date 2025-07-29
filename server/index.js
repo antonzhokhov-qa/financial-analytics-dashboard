@@ -347,6 +347,9 @@ function calculateAdvancedMetrics(data, provider) {
   
   // Анализ по методам оплаты
   const paymentMethodStats = analyzeByPaymentMethod(data, isSuccessful, isFailed, isPending)
+  
+  // Анализ по компаниям (только для Optipay)
+  const companyStats = provider === 'optipay' ? analyzeByCompany(data, isSuccessful, isFailed, isPending) : {}
 
   return {
     total,
@@ -361,6 +364,7 @@ function calculateAdvancedMetrics(data, provider) {
     provider,
     timeAnalysis,
     paymentMethodStats,
+    companyStats,
     currency: provider === 'payshack' ? 'INR' : 'TRY'
   }
 }
@@ -369,6 +373,13 @@ function calculateAdvancedMetrics(data, provider) {
 function analyzeByTime(data) {
   const hourlyStats = {}
   const dailyStats = {}
+  const weeklyStats = {}
+  const monthlyStats = {}
+  
+  // Инициализируем часы
+  for (let i = 0; i < 24; i++) {
+    hourlyStats[i] = { count: 0, revenue: 0, successful: 0, failed: 0, pending: 0 }
+  }
   
   data.forEach(row => {
     if (row.createdAt) {
@@ -376,27 +387,104 @@ function analyzeByTime(data) {
         const date = new Date(row.createdAt)
         const hour = date.getHours()
         const day = date.toISOString().split('T')[0]
+        const week = getWeekNumber(date)
+        const month = date.toISOString().substring(0, 7) // YYYY-MM
+        const dayOfWeek = date.getDay() // 0 = Sunday, 1 = Monday, etc.
         
         // Почасовая статистика
-        if (!hourlyStats[hour]) {
-          hourlyStats[hour] = { count: 0, revenue: 0 }
-        }
         hourlyStats[hour].count++
         hourlyStats[hour].revenue += row.amount
         
+        // Статистика по статусам
+        const status = row.status.toLowerCase()
+        if (status === 'success' || status === 'completed') {
+          hourlyStats[hour].successful++
+        } else if (status === 'failed') {
+          hourlyStats[hour].failed++
+        } else if (status === 'initiated' || status === 'pending' || status === 'in progress') {
+          hourlyStats[hour].pending++
+        }
+        
         // Дневная статистика
         if (!dailyStats[day]) {
-          dailyStats[day] = { count: 0, revenue: 0 }
+          dailyStats[day] = { count: 0, revenue: 0, successful: 0, failed: 0, pending: 0, dayOfWeek }
         }
         dailyStats[day].count++
         dailyStats[day].revenue += row.amount
+        
+        if (status === 'success' || status === 'completed') {
+          dailyStats[day].successful++
+        } else if (status === 'failed') {
+          dailyStats[day].failed++
+        } else if (status === 'initiated' || status === 'pending' || status === 'in progress') {
+          dailyStats[day].pending++
+        }
+        
+        // Недельная статистика
+        if (!weeklyStats[week]) {
+          weeklyStats[week] = { count: 0, revenue: 0, successful: 0, failed: 0, pending: 0 }
+        }
+        weeklyStats[week].count++
+        weeklyStats[week].revenue += row.amount
+        
+        if (status === 'success' || status === 'completed') {
+          weeklyStats[week].successful++
+        } else if (status === 'failed') {
+          weeklyStats[week].failed++
+        } else if (status === 'initiated' || status === 'pending' || status === 'in progress') {
+          weeklyStats[week].pending++
+        }
+        
+        // Месячная статистика
+        if (!monthlyStats[month]) {
+          monthlyStats[month] = { count: 0, revenue: 0, successful: 0, failed: 0, pending: 0 }
+        }
+        monthlyStats[month].count++
+        monthlyStats[month].revenue += row.amount
+        
+        if (status === 'success' || status === 'completed') {
+          monthlyStats[month].successful++
+        } else if (status === 'failed') {
+          monthlyStats[month].failed++
+        } else if (status === 'initiated' || status === 'pending' || status === 'in progress') {
+          monthlyStats[month].pending++
+        }
+        
       } catch (e) {
         // Игнорируем неправильные даты
       }
     }
   })
   
-  return { hourlyStats, dailyStats }
+  // Вычисляем пиковые часы и дни
+  const peakHour = Object.entries(hourlyStats)
+    .sort(([,a], [,b]) => b.count - a.count)[0]
+  
+  const peakDay = Object.entries(dailyStats)
+    .sort(([,a], [,b]) => b.count - a.count)[0]
+  
+  return { 
+    hourlyStats, 
+    dailyStats, 
+    weeklyStats, 
+    monthlyStats,
+    insights: {
+      peakHour: peakHour ? { hour: parseInt(peakHour[0]), ...peakHour[1] } : null,
+      peakDay: peakDay ? { date: peakDay[0], ...peakDay[1] } : null,
+      totalDays: Object.keys(dailyStats).length,
+      averageDailyTransactions: Object.keys(dailyStats).length > 0 ? 
+        Object.values(dailyStats).reduce((sum, day) => sum + day.count, 0) / Object.keys(dailyStats).length : 0
+    }
+  }
+}
+
+// Утилита для получения номера недели
+function getWeekNumber(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const dayNum = d.getUTCDay() || 7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7)
 }
 
 // Анализ по методам оплаты
@@ -415,6 +503,32 @@ function analyzeByPaymentMethod(data, isSuccessful, isFailed, isPending) {
     if (isSuccessful(row)) stats[method].successful++
     else if (isFailed(row)) stats[method].failed++
     else if (isPending(row)) stats[method].pending++
+  })
+  
+  return stats
+}
+
+// Анализ по компаниям (для Optipay)
+function analyzeByCompany(data, isSuccessful, isFailed, isPending) {
+  const stats = {}
+  
+  data.forEach(row => {
+    const company = row.originalData?.Company || row.company || 'Unknown'
+    if (!stats[company]) {
+      stats[company] = { total: 0, successful: 0, failed: 0, pending: 0, revenue: 0, completed: 0 }
+    }
+    
+    stats[company].total++
+    stats[company].revenue += row.amount
+    
+    if (isSuccessful(row)) {
+      stats[company].successful++
+      stats[company].completed++
+    } else if (isFailed(row)) {
+      stats[company].failed++
+    } else if (isPending(row)) {
+      stats[company].pending++
+    }
   })
   
   return stats
@@ -575,20 +689,21 @@ app.post('/api/process', upload.single('csvFile'), async (req, res) => {
           .on('error', reject)
       })
 
-      // Нормализуем данные (используем упрощенную версию)
-      const normalizedData = csvData.map(row => ({
-        ...row,
-        provider: provider,
-        dataSource: provider === 'payshack' ? 'payshack' : 'merchant'
-      }))
+      // Нормализуем данные используя полную нормализацию
+      const normalizedData = csvData.map(row => normalizeDataRow(row, provider))
 
-      // Вычисляем базовые метрики
-      const metrics = {
-        total: normalizedData.length,
+      // Вычисляем полные метрики (как на сервере)
+      const metrics = calculateAdvancedMetrics(normalizedData, provider)
+      metrics.processingTime = Date.now() - startTime
+      metrics.mode = 'client'
+      
+      console.log(`✅ Клиентская обработка завершена:`, {
+        records: normalizedData.length,
         provider: provider,
-        processingTime: Date.now() - startTime,
-        mode: 'client'
-      }
+        successful: metrics.successful,
+        failed: metrics.failed,
+        revenue: metrics.successfulRevenue
+      })
 
       // Очищаем файл
       if (fs.existsSync(filePath)) {

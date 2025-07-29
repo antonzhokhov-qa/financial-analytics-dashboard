@@ -35,19 +35,12 @@ const EnhancedAPIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) 
   const [expandedFilters, setExpandedFilters] = useState(false)
 
   // Доступные опции
-  const projects = [
-    { value: '', label: 'Все проекты' },
-    { value: 'preview', label: 'Preview' },
-    { value: 'monetix', label: 'Monetix' },
-    { value: 'caroussel', label: 'Caroussel' }
-  ]
-
+  const projects = enhancedAPI.getAvailableProjects()
   const statuses = [
     { value: '', label: 'Все статусы' },
     { value: 'success', label: 'Успешно' },
     { value: 'fail', label: 'Ошибка' },
-    { value: 'in_process', label: 'В процессе' },
-    { value: 'user_input_required', label: 'Требует ввода' }
+    { value: 'in_process', label: 'В процессе' }
   ]
 
   const paymentTypes = [

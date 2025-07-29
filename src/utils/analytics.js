@@ -1,194 +1,187 @@
-export function calculateMetrics(data, dataType = 'merchant') {
-  console.log('Calculating metrics for data:', data.length, 'rows, type:', dataType)
-  
-  // Определяем провайдера по структуре данных
-  const provider = data.length > 0 ? (data[0].provider || 'optipay') : 'optipay'
-  console.log('Detected provider:', provider)
-  
-  const total = data.length
-  
-  // Универсальная функция для определения успешных транзакций
-  const isSuccessful = (row) => {
-    const status = row.status ? row.status.toLowerCase() : ''
-    if (provider === 'payshack') {
-      return status === 'success'
-    } else if (dataType === 'platform') {
-      return status === 'success'
-    } else {
-      return status === 'completed'
-    }
-  }
-  
-  // Универсальная функция для определения неуспешных транзакций
-  const isFailed = (row) => {
-    const status = row.status ? row.status.toLowerCase() : ''
-    if (provider === 'payshack') {
-      return status === 'failed'
-    } else if (dataType === 'platform') {
-      return status === 'failed' || status === 'fail'
-    } else {
-      return status === 'failed'
-    }
-  }
-  
-  // Универсальная функция для определения отмененных транзакций
-  const isCanceled = (row) => {
-    const status = row.status ? row.status.toLowerCase() : ''
-    if (provider === 'payshack') {
-      return false // У Payshack нет статуса "canceled"
-    } else {
-      return status === 'canceled'
-    }
-  }
-  
-  // Функция для определения ожидающих транзакций
-  const isPending = (row) => {
-    const status = row.status ? row.status.toLowerCase() : ''
-    if (provider === 'payshack') {
-      return status === 'initiated' || status === 'pending'
-    } else if (dataType === 'platform') {
-      return status === 'in progress' || status === 'pending'
-    } else {
-      return status === 'pending'
-    }
-  }
-  
-  const successful = data.filter(isSuccessful).length
-  const failed = data.filter(isFailed).length
-  const canceled = data.filter(isCanceled).length
-  const pending = data.filter(isPending).length
+// Функция расчета метрик с поддержкой провайдеров
+export const calculateMetrics = (data, dataTypeOrProvider = 'merchant') => {
+  if (!data || data.length === 0) return null
 
-  // Анализ по типам транзакций
-  const deposits = data.filter(row => row.isDeposit)
-  const withdrawals = data.filter(row => row.isWithdraw)
+  console.log('📊 Расчет метрик для данных:', {
+    length: data.length,
+    providerOrType: dataTypeOrProvider,
+    sampleData: data.slice(0, 2)
+  })
+
+  // Определяем провайдера и валюту
+  let provider = null
+  let currency = 'TRY' // По умолчанию
   
-  const depositMetrics = {
-    total: deposits.length,
-    successful: deposits.filter(isSuccessful).length,
-    amount: deposits.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0),
-    successfulAmount: deposits
-      .filter(isSuccessful)
-      .reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0)
-  }
-  
-  const withdrawalMetrics = {
-    total: withdrawals.length,
-    successful: withdrawals.filter(isSuccessful).length,
-    amount: withdrawals.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0),
-    successfulAmount: withdrawals
-      .filter(isSuccessful)
-      .reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0)
-  }
-  
-  console.log('Status breakdown:', { total, successful, failed, canceled })
-  
-  // Проверим несколько строк для отладки
-  console.log('First 3 rows status check:', data.slice(0, 3).map(row => ({
-    status: row.status,
-    normalizedStatus: row.status ? row.status.toLowerCase() : '',
-    isCompleted: dataType === 'merchant' ? 
-      (row.status ? row.status.toLowerCase() === 'completed' : false) :
-      (row.status ? row.status.toLowerCase() === 'success' : false)
-  })))
-  
-  const conversionRate = total > 0 ? (successful / total) * 100 : 0
-  
-  const successfulRevenue = data
-    .filter(isSuccessful)
-    .reduce((sum, row) => {
-      const amount = parseFloat(row.amount) || 0
-      return sum + amount
-    }, 0)
-  
-  const totalAmount = data.reduce((sum, row) => {
-    const amount = parseFloat(row.amount) || 0
-    return sum + amount
-  }, 0)
-  
-  const lostRevenue = data
-    .filter(row => isFailed(row) || isCanceled(row))
-    .reduce((sum, row) => {
-      const amount = parseFloat(row.amount) || 0
-      return sum + amount
-    }, 0)
-  
-  const pendingRevenue = data
-    .filter(isPending)
-    .reduce((sum, row) => {
-      const amount = parseFloat(row.amount) || 0
-      return sum + amount
-    }, 0)
-  
-  const totalFees = data.reduce((sum, row) => {
-    const fee = parseFloat(row.fee) || 0
-    return sum + fee
-  }, 0)
-  
-  const averageAmount = total > 0 ? totalAmount / total : 0
-  
-  const amounts = data.map(row => parseFloat(row.amount) || 0)
-  const maxAmount = amounts.length > 0 ? Math.max(...amounts) : 0
-  const minAmount = amounts.length > 0 ? Math.min(...amounts) : 0
-  
-  // Анализ по компаниям (только для провайдера)
-  const companyStats = {}
-  if (dataType === 'merchant') {
-    data.forEach(row => {
-      const company = row.company || 'Unknown'
-      if (!companyStats[company]) {
-        companyStats[company] = { total: 0, completed: 0, failed: 0, canceled: 0, pending: 0, revenue: 0 }
-      }
-      companyStats[company].total++
-      companyStats[company].revenue += parseFloat(row.amount) || 0
-      
-      if (isSuccessful(row)) companyStats[company].completed++
-      else if (isFailed(row)) companyStats[company].failed++
-      else if (isCanceled(row)) companyStats[company].canceled++
-      else if (isPending(row)) companyStats[company].pending++
-    })
-  }
-  
-  // Анализ по методам оплаты
-  const paymentMethodStats = {}
-  data.forEach(row => {
-    const method = row.paymentMethod || 'Unknown'
-    if (!paymentMethodStats[method]) {
-      paymentMethodStats[method] = { total: 0, completed: 0, failed: 0, canceled: 0, pending: 0 }
+  // Автоматическое определение валюты из реальных данных
+  const currencyStats = {}
+  data.forEach(item => {
+    if (item.currency) {
+      currencyStats[item.currency] = (currencyStats[item.currency] || 0) + 1
     }
-    paymentMethodStats[method].total++
-    
-    if (isSuccessful(row)) paymentMethodStats[method].completed++
-    else if (isFailed(row)) paymentMethodStats[method].failed++
-    else if (isCanceled(row)) paymentMethodStats[method].canceled++
-    else if (isPending(row)) paymentMethodStats[method].pending++
   })
   
-  const metrics = {
+  // Выбираем наиболее часто встречающуюся валюту
+  if (Object.keys(currencyStats).length > 0) {
+    currency = Object.keys(currencyStats).reduce((a, b) => 
+      currencyStats[a] > currencyStats[b] ? a : b
+    )
+  }
+
+  // Пытаемся определить провайдера из данных или параметра
+  if (dataTypeOrProvider === 'paylab' || data.some(item => item.provider === 'paylab' || item.company === 'paylab' || item.project === 'paylab')) {
+    provider = 'paylab'
+    // Если валюта не определена из данных, используем EUR как дефолт для Paylab
+    if (!Object.keys(currencyStats).length) currency = 'EUR'
+  } else if (dataTypeOrProvider === 'payshack' || data.some(item => item.provider === 'payshack')) {
+    provider = 'payshack'
+    if (!Object.keys(currencyStats).length) currency = 'INR'
+  } else if (dataTypeOrProvider === 'optipay' || data.some(item => item.provider === 'optipay')) {
+    provider = 'optipay' 
+    if (!Object.keys(currencyStats).length) currency = 'TRY'
+  } else if (data.some(item => item.currency)) {
+    // Извлекаем валюту из первого элемента с валютой
+    const itemWithCurrency = data.find(item => item.currency)
+    currency = itemWithCurrency.currency
+    
+    // Пытаемся определить провайдера по валюте
+    if (currency === 'INR') provider = 'payshack'
+    else if (currency === 'TRY') provider = 'optipay'
+    else if (currency === 'EUR' || currency === 'USD') provider = 'paylab'
+  }
+
+  console.log('💰 Определены: провайдер =', provider, ', валюта =', currency)
+
+  const total = data.length
+
+  // Функции для определения статусов в зависимости от провайдера
+  const isSuccessful = (item) => {
+    const status = (item.status || '').toLowerCase()
+    if (provider === 'payshack') {
+      return status === 'success' || status === 'completed'
+    } else {
+      return item.isCompleted || status === 'completed' || status === 'success'
+    }
+  }
+
+  const isFailed = (item) => {
+    const status = (item.status || '').toLowerCase()
+    if (provider === 'payshack') {
+      return status === 'failed' || status === 'cancelled'
+    } else {
+      return item.isFailed || status === 'failed' || status === 'canceled'
+    }
+  }
+
+  const isPending = (item) => {
+    const status = (item.status || '').toLowerCase()
+    if (provider === 'payshack') {
+      return status === 'initiated' || status === 'pending'
+    } else {
+      return item.isPending || status === 'in progress' || status === 'pending'
+    }
+  }
+
+  const isCanceled = (item) => {
+    const status = (item.status || '').toLowerCase()
+    return status === 'canceled' || status === 'cancelled'
+  }
+
+  // Основные метрики
+  const successful = data.filter(isSuccessful).length
+  const failed = data.filter(isFailed).length  
+  const pending = data.filter(isPending).length
+  const canceled = data.filter(isCanceled).length
+
+  const conversionRate = total > 0 ? (successful / total) * 100 : 0
+
+  // Расчет выручки
+  const successfulRevenue = data.filter(isSuccessful)
+    .reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0)
+  
+  const lostRevenue = data.filter(item => isFailed(item) || isCanceled(item))
+    .reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0)
+  
+  const totalAmount = data.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0)
+  const averageAmount = total > 0 ? totalAmount / total : 0
+
+  // Комиссии (если есть в данных)
+  const totalFees = data.reduce((sum, item) => sum + (parseFloat(item.fees || item.fee || 0)), 0)
+
+  // Анализ по методам оплаты
+  const paymentMethodStats = {}
+  data.forEach(item => {
+    const method = item.paymentMethod || item.paymentMethodCode || item.paymentProduct || 'Unknown'
+    if (!paymentMethodStats[method]) {
+      paymentMethodStats[method] = { total: 0, successful: 0, failed: 0, pending: 0, revenue: 0, completed: 0 }
+    }
+    
+    paymentMethodStats[method].total++
+    paymentMethodStats[method].revenue += parseFloat(item.amount) || 0
+    
+    if (isSuccessful(item)) {
+      paymentMethodStats[method].successful++
+      paymentMethodStats[method].completed++
+    } else if (isFailed(item)) {
+      paymentMethodStats[method].failed++
+    } else if (isPending(item)) {
+      paymentMethodStats[method].pending++
+    }
+  })
+
+  // Анализ по компаниям (только для providerов с компаниями)
+  const companyStats = {}
+  if (provider === 'optipay') {
+    data.forEach(item => {
+      const company = item.company || item.project || 'Unknown'
+      if (!companyStats[company]) {
+        companyStats[company] = { total: 0, successful: 0, failed: 0, pending: 0, revenue: 0, completed: 0 }
+      }
+      
+      companyStats[company].total++
+      companyStats[company].revenue += parseFloat(item.amount) || 0
+      
+      if (isSuccessful(item)) {
+        companyStats[company].successful++
+        companyStats[company].completed++
+      } else if (isFailed(item)) {
+        companyStats[company].failed++
+      } else if (isPending(item)) {
+        companyStats[company].pending++
+      }
+    })
+  }
+
+  const result = {
     total,
     successful,
     failed,
-    canceled,
     pending,
+    canceled,
     conversionRate,
     successfulRevenue,
     lostRevenue,
-    pendingRevenue,
     totalAmount,
-    totalFees,
+    totalRevenue: totalAmount,
     averageAmount,
-    maxAmount,
-    minAmount,
-    companyStats,
+    totalFees,
     paymentMethodStats,
-    depositMetrics,
-    withdrawalMetrics,
-    dataType,
-    provider
+    companyStats,
+    provider,
+    currency,
+    // Для совместимости со старым кодом
+    completed: successful
   }
-  
-  console.log('Calculated metrics:', metrics)
-  
-  return metrics
+
+  console.log('✅ Метрики рассчитаны:', {
+    total: result.total,
+    successful: result.successful,
+    conversionRate: result.conversionRate.toFixed(2) + '%',
+    currency: result.currency,
+    provider: result.provider,
+    revenue: result.successfulRevenue
+  })
+
+  return result
 }
 
 export function generateInsights(data, metrics) {
@@ -459,4 +452,156 @@ export function detectAnomalies(data) {
   })
   
   return anomalies
+} 
+
+// Расширенная функция расчета метрик для Enhanced API с поддержкой мультивалютности
+export const calculateEnhancedMetrics = (data, dataSource = 'enhanced-api') => {
+  if (!data || data.length === 0) return null
+
+  console.log('🚀 Расчет расширенных метрик для Enhanced API:', {
+    length: data.length,
+    dataSource: dataSource,
+    sampleData: data.slice(0, 2)
+  })
+
+  // Анализ валют в данных
+  const currencyBreakdown = {}
+  const merchantBreakdown = {}
+  
+  data.forEach(item => {
+    const currency = item.currency || 'UNKNOWN'
+    const merchant = item.project || item.company || 'UNKNOWN'
+    
+    // Анализ по валютам
+    if (!currencyBreakdown[currency]) {
+      currencyBreakdown[currency] = {
+        total: 0,
+        successful: 0,
+        failed: 0,
+        pending: 0,
+        totalAmount: 0,
+        successfulRevenue: 0,
+        lostRevenue: 0,
+        merchants: new Set()
+      }
+    }
+    
+    const currencyData = currencyBreakdown[currency]
+    currencyData.total++
+    currencyData.totalAmount += parseFloat(item.amount) || 0
+    currencyData.merchants.add(merchant)
+    
+    if (item.isCompleted) {
+      currencyData.successful++
+      currencyData.successfulRevenue += parseFloat(item.amount) || 0
+    } else if (item.isFailed) {
+      currencyData.failed++
+      currencyData.lostRevenue += parseFloat(item.amount) || 0
+    } else if (item.isInProcess) {
+      currencyData.pending++
+    }
+    
+    // Анализ по мерчантам
+    if (!merchantBreakdown[merchant]) {
+      merchantBreakdown[merchant] = {
+        total: 0,
+        successful: 0,
+        failed: 0,
+        pending: 0,
+        totalAmount: 0,
+        successfulRevenue: 0,
+        currencies: new Set()
+      }
+    }
+    
+    const merchantData = merchantBreakdown[merchant]
+    merchantData.total++
+    merchantData.totalAmount += parseFloat(item.amount) || 0
+    merchantData.currencies.add(currency)
+    
+    if (item.isCompleted) {
+      merchantData.successful++
+      merchantData.successfulRevenue += parseFloat(item.amount) || 0
+    } else if (item.isFailed) {
+      merchantData.failed++
+    } else if (item.isInProcess) {
+      merchantData.pending++
+    }
+  })
+
+  // Основные метрики (общие)
+  const total = data.length
+  const successful = data.filter(item => item.isCompleted).length
+  const failed = data.filter(item => item.isFailed).length
+  const pending = data.filter(item => item.isInProcess).length
+  const conversionRate = total > 0 ? (successful / total) * 100 : 0
+
+  // Определяем основную валюту (наиболее часто встречающуюся)
+  const mainCurrency = Object.keys(currencyBreakdown).reduce((a, b) => 
+    currencyBreakdown[a].total > currencyBreakdown[b].total ? a : b
+  ) || 'TRY'
+
+  // Общие суммы
+  const totalAmount = data.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0)
+  const successfulRevenue = data.filter(item => item.isCompleted)
+    .reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0)
+  const averageAmount = total > 0 ? totalAmount / total : 0
+
+  console.log('💰 Анализ валют в Enhanced API:', {
+    mainCurrency: mainCurrency,
+    currenciesFound: Object.keys(currencyBreakdown),
+    merchantsFound: Object.keys(merchantBreakdown),
+    currencyBreakdown: Object.keys(currencyBreakdown).map(curr => ({
+      currency: curr,
+      total: currencyBreakdown[curr].total,
+      amount: currencyBreakdown[curr].totalAmount.toFixed(2),
+      merchants: Array.from(currencyBreakdown[curr].merchants)
+    }))
+  })
+
+  return {
+    // Основные метрики
+    total,
+    successful,
+    failed,
+    pending,
+    canceled: 0, // В Enhanced API обычно нет отмененных
+    conversionRate,
+    
+    // Финансовые метрики  
+    totalAmount,
+    successfulRevenue,
+    lostRevenue: totalAmount - successfulRevenue,
+    averageAmount,
+    totalFees: 0, // Пока не обрабатываем комиссии в Enhanced API
+    
+    // Валюта и тип данных
+    currency: mainCurrency,
+    dataType: 'enhanced-api',
+    provider: 'enhanced-api',
+    
+    // Расширенная аналитика
+    currencyBreakdown: Object.keys(currencyBreakdown).map(currency => ({
+      currency,
+      ...currencyBreakdown[currency],
+      merchants: Array.from(currencyBreakdown[currency].merchants),
+      conversionRate: currencyBreakdown[currency].total > 0 
+        ? (currencyBreakdown[currency].successful / currencyBreakdown[currency].total * 100).toFixed(2) + '%'
+        : '0%'
+    })),
+    
+    merchantBreakdown: Object.keys(merchantBreakdown).map(merchant => ({
+      merchant,
+      ...merchantBreakdown[merchant],
+      currencies: Array.from(merchantBreakdown[merchant].currencies),
+      conversionRate: merchantBreakdown[merchant].total > 0
+        ? (merchantBreakdown[merchant].successful / merchantBreakdown[merchant].total * 100).toFixed(2) + '%' 
+        : '0%'
+    })),
+    
+    // Статистика мультивалютности
+    isMultiCurrency: Object.keys(currencyBreakdown).length > 1,
+    currencyCount: Object.keys(currencyBreakdown).length,
+    merchantCount: Object.keys(merchantBreakdown).length
+  }
 } 

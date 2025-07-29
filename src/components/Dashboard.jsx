@@ -16,6 +16,7 @@ import AnomalyDetection from './AnomalyDetection'
 import TimezoneSelector from './TimezoneSelector'
 import TimeBasedChartsGrid from './TimeBasedChartsGrid'
 import BeautifulChartsGrid from './BeautifulChartsGrid'
+import TimeAnalyticsGrid from './TimeAnalyticsGrid'
 import EnhancedChartsGrid from './EnhancedChartsGrid'
 import PredictiveAnalytics from './PredictiveAnalytics'
 import { TrendingUp, TrendingDown, DollarSign, Users, Activity, AlertTriangle, Brain, BarChart3 } from 'lucide-react'
@@ -649,7 +650,11 @@ const Dashboard = ({
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
         {/* Метрики */}
         {metrics && (
-          <MetricsGrid metrics={metrics} dataType={dataType} />
+          <MetricsGrid 
+            metrics={metrics} 
+            dataType={dataType} 
+            selectedProvider={selectedProvider}
+          />
         )}
 
         {/* Фильтры и часовые пояса */}
@@ -699,6 +704,13 @@ const Dashboard = ({
           </div>
                       <BeautifulChartsGrid data={filteredData} timezone={timezone} dataType={dataType} />
         </div>
+
+        {/* Расширенная временная аналитика */}
+        {metrics && (
+          <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
+            <TimeAnalyticsGrid data={filteredData} metrics={metrics} />
+          </div>
+        )}
 
         {/* Расширенная аналитика с Chart.js */}
         <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10">

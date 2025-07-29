@@ -25,7 +25,12 @@ class EnhancedCollectorAPI {
   }
 
   getAvailableProjects() {
-    return this.baseApi.getAvailableProjects()
+    return [
+      { value: '', label: 'Все проекты' },
+      { value: 'monetix', label: 'Monetix' },
+      { value: 'caroussel', label: 'Caroussel' },
+      { value: 'paylab', label: 'Paylab' }
+    ]
   }
 
   getAvailableStatuses() {
@@ -275,27 +280,43 @@ function normalizeEnhancedOperations(apiData) {
         date: operation.date
       })
     }
-    // Исправленная логика для реальной структуры API
+    // Исправленная логика для реальной структуры API с поддержкой разных мерчантов
     let amount = 0
-    let currency = 'TRY'
+    let currency = 'TRY' // Дефолтная валюта
     let fee = 0
     
-    // Извлекаем сумму и валюту из card_start (основной источник для активных операций)
-    if (operation.card_start && operation.card_start.length > 0) {
-      const cardData = operation.card_start[0]
-      amount = parseFloat(cardData.amount || 0)
-      currency = cardData.currency || 'TRY'
-      // fee пока не извлекаем из card_start, так как его там нет в примере
+    // УЛУЧШЕННОЕ ИЗВЛЕЧЕНИЕ ВАЛЮТЫ ИЗ ОТВЕТА КОЛЛЕКТОРА
+    // Приоритет: complete_currency -> card_start.currency -> create_params.currency
+    
+    // 1. Проверяем complete_currency (для завершенных операций)
+    if (operation.complete_currency) {
+      currency = operation.complete_currency
+      if (operation.complete_amount) {
+        amount = parseFloat(operation.complete_amount)
+      }
     }
     
-    // Если нет card_start, пробуем create_params
+    // 2. Извлекаем сумму и валюту из card_start (для активных операций)
+    if (operation.card_start && operation.card_start.length > 0) {
+      const cardData = operation.card_start[0]
+      amount = parseFloat(cardData.amount || amount)
+      // Валюта из card_start имеет приоритет если complete_currency нет
+      if (!operation.complete_currency && cardData.currency) {
+        currency = cardData.currency
+      }
+    }
+    
+    // 3. Если нет card_start, пробуем create_params
     if (amount === 0 && operation.create_params?.params?.payment?.amount) {
       const createAmount = operation.create_params.params.payment.amount
       amount = parseFloat(createAmount.value || 0) / 100 // API отдает в копейках (350000 = 3500)
-      currency = createAmount.currency || 'TRY'
+      // Валюта из create_params используется если нет более приоритетных источников
+      if (!operation.complete_currency && !operation.card_start?.[0]?.currency && createAmount.currency) {
+        currency = createAmount.currency
+      }
     }
     
-    // Фолбэк на старые поля (для обратной совместимости)
+    // 4. Фолбэк на старые поля (для обратной совместимости)
     if (amount === 0) {
       amount = parseFloat(
         operation.operation_amount ||
@@ -306,17 +327,25 @@ function normalizeEnhancedOperations(apiData) {
       )
     }
     
-    // Валюта - фолбэк
-    if (currency === 'TRY' && operation.operation_currency) {
-      currency = operation.operation_currency
+    // 5. Валюта - дополнительные источники
+    if (currency === 'TRY') { // Если все еще дефолтная валюта
+      currency = operation.operation_currency || 
+                operation.payment_info?.currency ||
+                operation.currency ||
+                currency // Оставляем TRY если ничего не найдено
     }
     
     if (index < 3) {
-      console.log(`💰 Amount extraction for operation ${index + 1}:`, {
-        card_start_amount: operation.card_start?.[0]?.amount,
-        create_params_amount: operation.create_params?.params?.payment?.amount?.value,
+      console.log(`💰 Извлечение валюты для операции ${index + 1}:`, {
+        complete_currency: operation.complete_currency,
+        card_start_currency: operation.card_start?.[0]?.currency,
+        create_params_currency: operation.create_params?.params?.payment?.amount?.currency,
+        operation_currency: operation.operation_currency,
+        payment_info_currency: operation.payment_info?.currency,
+        final_currency: currency,
         final_amount: amount,
-        currency: currency
+        project: operation.project,
+        merchant: operation.project // проект обычно = мерчант
       })
     }
     
@@ -601,6 +630,40 @@ function normalizeEnhancedOperations(apiData) {
     return acc
   }, { total: 0, deposits: 0, withdrawals: 0, unknown: 0 })
 
+  // АНАЛИТИКА ПО ВАЛЮТАМ И МЕРЧАНТАМ
+  const currencyAnalysis = {}
+  const merchantAnalysis = {}
+  
+  normalized.forEach(op => {
+    // Анализ по валютам
+    if (!currencyAnalysis[op.currency]) {
+      currencyAnalysis[op.currency] = {
+        count: 0,
+        totalAmount: 0,
+        successful: 0,
+        merchants: new Set()
+      }
+    }
+    currencyAnalysis[op.currency].count++
+    currencyAnalysis[op.currency].totalAmount += op.amount
+    if (op.isCompleted) currencyAnalysis[op.currency].successful++
+    currencyAnalysis[op.currency].merchants.add(op.project)
+    
+    // Анализ по мерчантам
+    if (!merchantAnalysis[op.project]) {
+      merchantAnalysis[op.project] = {
+        count: 0,
+        totalAmount: 0,
+        successful: 0,
+        currencies: new Set()
+      }
+    }
+    merchantAnalysis[op.project].count++
+    merchantAnalysis[op.project].totalAmount += op.amount
+    if (op.isCompleted) merchantAnalysis[op.project].successful++
+    merchantAnalysis[op.project].currencies.add(op.currency)
+  })
+
   console.log('🏁 Enhanced normalization complete:', {
     totalOperations: normalized.length,
     successfulCount: normalized.filter(op => op.isCompleted).length,
@@ -613,7 +676,19 @@ function normalizeEnhancedOperations(apiData) {
       withdrawals: directionStats.withdrawals,
       unknown: directionStats.unknown,
       detectionRate: ((directionStats.deposits + directionStats.withdrawals) / directionStats.total * 100).toFixed(1) + '%'
-    }
+    },
+    currencyBreakdown: Object.keys(currencyAnalysis).map(curr => ({
+      currency: curr,
+      count: currencyAnalysis[curr].count,
+      totalAmount: currencyAnalysis[curr].totalAmount.toFixed(2),
+      merchants: Array.from(currencyAnalysis[curr].merchants)
+    })),
+    merchantBreakdown: Object.keys(merchantAnalysis).map(merchant => ({
+      merchant: merchant,
+      count: merchantAnalysis[merchant].count,
+      totalAmount: merchantAnalysis[merchant].totalAmount.toFixed(2),
+      currencies: Array.from(merchantAnalysis[merchant].currencies)
+    }))
   })
 
   return normalized

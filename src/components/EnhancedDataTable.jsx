@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { ChevronDown, ChevronUp, Search, Filter, Download, ExternalLink, User, CreditCard, Globe, Coins, Shield, Eye, EyeOff, DollarSign } from 'lucide-react'
 import { Card, CardContent } from './ui/Card'
+import { calculateEnhancedMetrics } from '../utils/analytics'
 
 const EnhancedDataTable = ({ data }) => {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
@@ -9,6 +10,23 @@ const EnhancedDataTable = ({ data }) => {
   const [itemsPerPage] = useState(15)
   const [selectedView, setSelectedView] = useState('overview') // overview, detailed, cards, rates
   const [expandedRows, setExpandedRows] = useState(new Set())
+  const [filters, setFilters] = useState({
+    status: '',
+    project: '', 
+    currency: '',
+    search: ''
+  })
+  const [filteredData, setFilteredData] = useState(data)
+  const [metrics, setMetrics] = useState(null)
+
+  // Вычисляем метрики с поддержкой мультивалютности
+  useEffect(() => {
+    if (data && data.length > 0) {
+      const enhancedMetrics = calculateEnhancedMetrics(data, 'enhanced-api')
+      setMetrics(enhancedMetrics)
+      console.log('📊 Enhanced metrics calculated:', enhancedMetrics)
+    }
+  }, [data])
 
   useEffect(() => {
     setCurrentPage(1)

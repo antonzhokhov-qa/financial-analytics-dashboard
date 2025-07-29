@@ -140,7 +140,8 @@ export class CollectorAPI {
     return [
       { value: '', label: 'Все проекты' },
       { value: 'monetix', label: 'Monetix' },
-      { value: 'caroussel', label: 'Caroussel' }
+      { value: 'caroussel', label: 'Caroussel' },
+      { value: 'paylab', label: 'Paylab' }
     ]
   }
 

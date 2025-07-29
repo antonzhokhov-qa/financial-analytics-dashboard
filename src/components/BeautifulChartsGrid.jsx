@@ -40,13 +40,12 @@ const BeautifulChartsGrid = ({ data, dataType, timezone = 'UTC' }) => {
     return new Date(date.getTime() + offset * 60 * 60 * 1000)
   }
 
-  // Подготовка данных для графиков объемов по часам
-  const hourlyVolumeData = useMemo(() => {
-    console.log('⏰ Processing hourly data for beautiful charts...')
+  // Подготовка данных для горизонтальных линейных графиков по часам
+  const hourlyLineData = useMemo(() => {
+    console.log('⏰ Processing hourly line data for beautiful charts...')
     
-    // Проверяем что данные существуют и не пустые
     if (!data || !Array.isArray(data) || data.length === 0) {
-      console.log('⚠️ No data available for hourly charts')
+      console.log('⚠️ No data available for hourly line charts')
       return []
     }
     
@@ -64,19 +63,20 @@ const BeautifulChartsGrid = ({ data, dataType, timezone = 'UTC' }) => {
         hourlyData[hour] = {
           hour: `${hour.toString().padStart(2, '0')}:00`,
           shortHour: `${hour}h`,
+          hourNumber: hour,
           volume: 0,
           count: 0,
           success: 0,
           failed: 0,
           successVolume: 0,
-          failedVolume: 0
+          failedVolume: 0,
+          conversionRate: 0
         }
       }
       
       hourlyData[hour].volume += amount
       hourlyData[hour].count += 1
       
-      // Улучшенная логика определения статуса для разных источников данных
       const status = (item.status || '').toLowerCase()
       const isSuccess = item.isCompleted || 
                        status === 'completed' || 
@@ -101,29 +101,106 @@ const BeautifulChartsGrid = ({ data, dataType, timezone = 'UTC' }) => {
       hourlyData[i] || {
         hour: `${i.toString().padStart(2, '0')}:00`,
         shortHour: `${i}h`,
+        hourNumber: i,
         volume: 0,
         count: 0,
         success: 0,
         failed: 0,
         successVolume: 0,
-        failedVolume: 0
+        failedVolume: 0,
+        conversionRate: 0
       }
-    ).filter(item => item.count > 0) // Показываем только активные часы
+    ).map(item => ({
+      ...item,
+      conversionRate: item.count > 0 ? (item.success / item.count) * 100 : 0
+    }))
     
-    console.log('⏰ Beautiful hourly processing complete:', {
-      activeHours: result.length,
-      totalSuccess: result.reduce((sum, h) => sum + h.success, 0),
+    console.log('⏰ Hourly line processing complete:', {
+      totalHours: result.length,
+      activeHours: result.filter(h => h.count > 0).length,
       totalVolume: result.reduce((sum, h) => sum + h.volume, 0)
     })
     
-    return result.slice(0, 12) // Топ 12 часов
+    return result
+  }, [data, timezone])
+
+  // Подготовка данных для 15-минутных интервалов
+  const fifteenMinuteData = useMemo(() => {
+    console.log('🕐 Processing 15-minute interval data...')
+    
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      console.log('⚠️ No data available for 15-minute charts')
+      return []
+    }
+    
+    const intervalData = {}
+    
+    data.forEach((item) => {
+      const dateField = item.createdAt || item.date || item.operation_created_at
+      if (!dateField) return
+      
+      const date = convertToTimezone(dateField, timezone)
+      const hour = date.getHours()
+      const minute = date.getMinutes()
+      const intervalMinute = Math.floor(minute / 15) * 15 // 0, 15, 30, 45
+      const intervalKey = `${hour.toString().padStart(2, '0')}:${intervalMinute.toString().padStart(2, '0')}`
+      const amount = parseFloat(item.amount || 0)
+      
+      if (!intervalData[intervalKey]) {
+        intervalData[intervalKey] = {
+          time: intervalKey,
+          displayTime: `${hour.toString().padStart(2, '0')}:${intervalMinute.toString().padStart(2, '0')}`,
+          hourMinute: hour * 60 + intervalMinute,
+          volume: 0,
+          count: 0,
+          success: 0,
+          failed: 0,
+          successVolume: 0,
+          failedVolume: 0
+        }
+      }
+      
+      intervalData[intervalKey].volume += amount
+      intervalData[intervalKey].count += 1
+      
+      const status = (item.status || '').toLowerCase()
+      const isSuccess = item.isCompleted || 
+                       status === 'completed' || 
+                       status === 'success' || 
+                       status === 'complete'
+      const isFailed = item.isFailed || 
+                      status === 'failed' || 
+                      status === 'fail' || 
+                      status === 'canceled' ||
+                      status === 'cancelled'
+      
+      if (isSuccess) {
+        intervalData[intervalKey].success += 1
+        intervalData[intervalKey].successVolume += amount
+      } else if (isFailed) {
+        intervalData[intervalKey].failed += 1
+        intervalData[intervalKey].failedVolume += amount
+      }
+    })
+
+    const result = Object.values(intervalData)
+      .sort((a, b) => a.hourMinute - b.hourMinute)
+      .filter(item => item.count > 0) // Показываем только активные интервалы
+      .slice(0, 24) // Топ 24 интервала
+    
+    console.log('🕐 15-minute processing complete:', {
+      activeIntervals: result.length,
+      totalVolume: result.reduce((sum, i) => sum + i.volume, 0),
+      totalTransactions: result.reduce((sum, i) => sum + i.count, 0)
+    })
+    
+    return result
   }, [data, timezone])
 
   // Подготовка данных для графиков объемов по дням
   const dailyVolumeData = useMemo(() => {
     console.log('📅 Processing daily data for beautiful charts...')
     
-    // Проверяем что данные существуют и не пустые
     if (!data || !Array.isArray(data) || data.length === 0) {
       console.log('⚠️ No data available for daily charts')
       return []
@@ -156,7 +233,6 @@ const BeautifulChartsGrid = ({ data, dataType, timezone = 'UTC' }) => {
       dailyData[day].volume += amount
       dailyData[day].count += 1
       
-      // Улучшенная логика определения статуса для разных источников данных
       const status = (item.status || '').toLowerCase()
       const isSuccess = item.isCompleted || 
                        status === 'completed' || 
@@ -182,11 +258,10 @@ const BeautifulChartsGrid = ({ data, dataType, timezone = 'UTC' }) => {
         ...day,
         conversionRate: day.count > 0 ? (day.success / day.count) * 100 : 0
       }))
-      .slice() // Создаем копию перед сортировкой
       .sort((a, b) => b.volume - a.volume) // Сортируем по объему
       .slice(0, 10) // Топ 10 дней
       
-    console.log('📅 Beautiful daily processing complete:', {
+    console.log('📅 Daily processing complete:', {
       activeDays: result.length,
       totalSuccess: result.reduce((sum, d) => sum + d.success, 0),
       totalVolume: result.reduce((sum, d) => sum + d.volume, 0)
@@ -287,11 +362,20 @@ const BeautifulChartsGrid = ({ data, dataType, timezone = 'UTC' }) => {
       return firstItemWithCurrency.currency
     }
     
+    // Проверяем provider для определения валюты
+    const firstItemWithProvider = data.find(item => item.provider)
+    if (firstItemWithProvider) {
+      const currency = firstItemWithProvider.provider === 'payshack' ? 'INR' : 'TRY'
+      console.log('💰 Currency detected from provider:', currency)
+      return currency
+    }
+    
     // Проверяем форматированные суммы для извлечения валюты
     const firstItemWithFormatted = data.find(item => item.amountFormatted)
     if (firstItemWithFormatted) {
       const formatted = firstItemWithFormatted.amountFormatted
       if (formatted.includes('TRY') || formatted.includes('₺')) return 'TRY'
+      if (formatted.includes('INR') || formatted.includes('₹')) return 'INR'
       if (formatted.includes('EUR') || formatted.includes('€')) return 'EUR'
       if (formatted.includes('USD') || formatted.includes('$')) return 'USD'
     }
@@ -302,14 +386,31 @@ const BeautifulChartsGrid = ({ data, dataType, timezone = 'UTC' }) => {
 
   const formatCurrency = (value) => {
     const currency = getCurrency
-    const locale = currency === 'TRY' ? 'tr-TR' : 'en-US'
+    let locale = 'en-US'
     
-    return new Intl.NumberFormat(locale, {
+    // Определяем локаль в зависимости от валюты
+    if (currency === 'TRY') locale = 'tr-TR'
+    else if (currency === 'INR') locale = 'en-IN'
+    
+    const options = {
       style: 'currency',
       currency: currency,
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
-    }).format(value)
+    }
+    
+    // Для INR используем специальное форматирование для больших сумм
+    if (currency === 'INR') {
+      options.maximumFractionDigits = 2
+      // Для больших сумм в INR показываем лакхи и кроры
+      if (value >= 10000000) { // 1 crore
+        return `₹${(value / 10000000).toFixed(1)}Cr`
+      } else if (value >= 100000) { // 1 lakh
+        return `₹${(value / 100000).toFixed(1)}L`
+      }
+    }
+    
+    return new Intl.NumberFormat(locale, options).format(value)
   }
 
   // Компонент кастомного тултипа
@@ -612,32 +713,33 @@ const BeautifulChartsGrid = ({ data, dataType, timezone = 'UTC' }) => {
       {/* Все графики показываем сразу */}
       <div className="space-y-8">
         
-        {/* Первый ряд - Объемы по часам и дням */}
+        {/* Первый ряд - Горизонтальные линейные графики по часам и 15 минуткам */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-          {/* Объемы по часам */}
-          <Card className="group hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500">
+          {/* Почасовые линейные графики (горизонтальные) */}
+          <Card className="group hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-500">
             <CardContent className="p-6">
               <CardTitle className="mb-6 flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center">
                   <Clock className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-white">Топ часы по объему</h3>
-                  <p className="text-sm text-gray-400">Активные часы с транзакциями</p>
+                  <h3 className="text-xl font-bold text-white">Объем по часам (линейный)</h3>
+                  <p className="text-sm text-gray-400">Горизонтальный тренд по 24 часам</p>
                 </div>
               </CardTitle>
               
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={Array.isArray(hourlyVolumeData) ? hourlyVolumeData : []}
+                  <LineChart
+                    data={hourlyLineData}
                     margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                    key={`hourly-${animationKey}`}
+                    key={`hourly-line-${animationKey}`}
                   >
                     <defs>
-                      <linearGradient id="hourlyGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#8B5CF6" stopOpacity={1}/>
-                        <stop offset="100%" stopColor="#06B6D4" stopOpacity={0.8}/>
+                      <linearGradient id="hourlyLineGradient" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor="#8B5CF6" stopOpacity={0.8}/>
+                        <stop offset="50%" stopColor="#06B6D4" stopOpacity={0.6}/>
+                        <stop offset="100%" stopColor="#10B981" stopOpacity={0.8}/>
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
@@ -653,47 +755,64 @@ const BeautifulChartsGrid = ({ data, dataType, timezone = 'UTC' }) => {
                       tickFormatter={formatCurrency}
                     />
                     <Tooltip content={<CustomTooltip />} />
-                    <Bar 
+                    <Line 
+                      type="monotone"
                       dataKey="volume" 
-                      fill="url(#hourlyGradient)"
-                      radius={[4, 4, 0, 0]}
+                      stroke="url(#hourlyLineGradient)"
+                      strokeWidth={3}
+                      dot={{ fill: '#8B5CF6', strokeWidth: 2, r: 5 }}
+                      activeDot={{ r: 7, stroke: '#8B5CF6', strokeWidth: 2, fill: '#FFFFFF' }}
                       name="Объем"
                     />
-                  </BarChart>
+                    <Line 
+                      type="monotone"
+                      dataKey="count" 
+                      stroke="#F59E0B"
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      dot={{ fill: '#F59E0B', strokeWidth: 1, r: 3 }}
+                      name="Количество"
+                    />
+                  </LineChart>
                 </ResponsiveContainer>
               </div>
             </CardContent>
           </Card>
 
-          {/* Объемы по дням */}
+          {/* 15-минутные интервалы (горизонтальные линейные) */}
           <Card className="group hover:shadow-2xl hover:shadow-green-500/10 transition-all duration-500">
             <CardContent className="p-6">
               <CardTitle className="mb-6 flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
-                  <Calendar className="w-5 h-5 text-white" />
+                  <Zap className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-white">Топ дни по объему</h3>
-                  <p className="text-sm text-gray-400">Лучшие дни по выручке</p>
+                  <h3 className="text-xl font-bold text-white">15-минутные интервалы</h3>
+                  <p className="text-sm text-gray-400">Детальная динамика активности</p>
                 </div>
               </CardTitle>
               
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={Array.isArray(dailyVolumeData) ? dailyVolumeData : []}
+                  <AreaChart
+                    data={fifteenMinuteData}
                     margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                    key={`daily-${animationKey}`}
+                    key={`fifteen-min-${animationKey}`}
                   >
                     <defs>
-                      <linearGradient id="dailyGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#10B981" stopOpacity={1}/>
-                        <stop offset="100%" stopColor="#059669" stopOpacity={0.8}/>
+                      <linearGradient id="fifteenMinGradient" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor="#10B981" stopOpacity={0.8}/>
+                        <stop offset="50%" stopColor="#06B6D4" stopOpacity={0.6}/>
+                        <stop offset="100%" stopColor="#8B5CF6" stopOpacity={0.8}/>
+                      </linearGradient>
+                      <linearGradient id="fifteenMinAreaGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#10B981" stopOpacity={0.4}/>
+                        <stop offset="100%" stopColor="#10B981" stopOpacity={0.1}/>
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
                     <XAxis 
-                      dataKey="displayDate"
+                      dataKey="displayTime"
                       stroke="#9CA3AF"
                       fontSize={12}
                       angle={-45}
@@ -706,20 +825,31 @@ const BeautifulChartsGrid = ({ data, dataType, timezone = 'UTC' }) => {
                       tickFormatter={formatCurrency}
                     />
                     <Tooltip content={<CustomTooltip />} />
-                    <Bar 
+                    <Area
+                      type="monotone"
                       dataKey="volume" 
-                      fill="url(#dailyGradient)"
-                      radius={[4, 4, 0, 0]}
+                      stroke="url(#fifteenMinGradient)"
+                      fill="url(#fifteenMinAreaGradient)"
+                      strokeWidth={3}
                       name="Объем"
                     />
-                  </BarChart>
+                    <Line 
+                      type="monotone"
+                      dataKey="count" 
+                      stroke="#F59E0B"
+                      strokeWidth={2}
+                      strokeDasharray="3 3"
+                      dot={{ fill: '#F59E0B', strokeWidth: 1, r: 2 }}
+                      name="Транзакции"
+                    />
+                  </AreaChart>
                 </ResponsiveContainer>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Второй ряд - Конверсия */}
+        {/* Второй ряд - Конверсия по часам (линейный график) */}
         <Card className="group hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500">
           <CardContent className="p-6">
             <CardTitle className="mb-6 flex items-center gap-3">
@@ -727,27 +857,28 @@ const BeautifulChartsGrid = ({ data, dataType, timezone = 'UTC' }) => {
                 <Target className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-white">Конверсия по дням</h3>
-                <p className="text-sm text-gray-400">Процент успешных операций</p>
+                <h3 className="text-xl font-bold text-white">Конверсия по часам</h3>
+                <p className="text-sm text-gray-400">Процент успешных операций в течение дня</p>
               </div>
             </CardTitle>
             
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={Array.isArray(dailyVolumeData) ? [...dailyVolumeData].sort((a, b) => new Date(a.date) - new Date(b.date)) : []}
+                <LineChart
+                  data={hourlyLineData.filter(h => h.count > 0)}
                   margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                  key={`conversion-${animationKey}`}
+                  key={`conversion-line-${animationKey}`}
                 >
                   <defs>
-                    <linearGradient id="conversionGradient" x1="0" y1="0" x2="0" y2="1">
+                    <linearGradient id="conversionLineGradient" x1="0" y1="0" x2="1" y2="0">
                       <stop offset="0%" stopColor="#F59E0B" stopOpacity={0.8}/>
-                      <stop offset="100%" stopColor="#F59E0B" stopOpacity={0.1}/>
+                      <stop offset="50%" stopColor="#10B981" stopOpacity={0.8}/>
+                      <stop offset="100%" stopColor="#8B5CF6" stopOpacity={0.8}/>
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
                   <XAxis 
-                    dataKey="displayDate"
+                    dataKey="shortHour"
                     stroke="#9CA3AF"
                     fontSize={12}
                   />
@@ -755,17 +886,72 @@ const BeautifulChartsGrid = ({ data, dataType, timezone = 'UTC' }) => {
                     stroke="#9CA3AF"
                     fontSize={12}
                     tickFormatter={(value) => `${value}%`}
+                    domain={[0, 100]}
                   />
                   <Tooltip content={<CustomTooltip />} />
-                  <Area
+                  <Line
                     type="monotone"
                     dataKey="conversionRate"
-                    stroke="#F59E0B"
-                    fill="url(#conversionGradient)"
+                    stroke="url(#conversionLineGradient)"
                     strokeWidth={3}
+                    dot={{ fill: '#F59E0B', strokeWidth: 2, r: 5 }}
+                    activeDot={{ r: 7, stroke: '#F59E0B', strokeWidth: 2, fill: '#FFFFFF' }}
                     name="Конверсия (%)"
                   />
-                </AreaChart>
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Третий ряд - Объемы по дням (для сравнения, можно оставить столбцовым) */}
+        <Card className="group hover:shadow-2xl hover:shadow-cyan-500/10 transition-all duration-500">
+          <CardContent className="p-6">
+            <CardTitle className="mb-6 flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-xl flex items-center justify-center">
+                <Calendar className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-white">Топ дни по объему</h3>
+                <p className="text-sm text-gray-400">Лучшие дни по выручке</p>
+              </div>
+            </CardTitle>
+            
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={dailyVolumeData}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                  key={`daily-${animationKey}`}
+                >
+                  <defs>
+                    <linearGradient id="dailyGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#06B6D4" stopOpacity={1}/>
+                      <stop offset="100%" stopColor="#0891B2" stopOpacity={0.8}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
+                  <XAxis 
+                    dataKey="displayDate"
+                    stroke="#9CA3AF"
+                    fontSize={12}
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                  />
+                  <YAxis 
+                    stroke="#9CA3AF"
+                    fontSize={12}
+                    tickFormatter={formatCurrency}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar 
+                    dataKey="volume" 
+                    fill="url(#dailyGradient)"
+                    radius={[4, 4, 0, 0]}
+                    name="Объем"
+                  />
+                </BarChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
