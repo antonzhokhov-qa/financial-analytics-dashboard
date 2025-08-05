@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useTranslation } from '../contexts/LanguageContext'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, AreaChart, Area, Cell, PieChart, Pie } from 'recharts'
 import { TrendingUp, TrendingDown, Clock, Calendar, DollarSign, Percent, Activity, Users, Zap, Target, ArrowUp, ArrowDown } from 'lucide-react'
 import { Card, CardContent, CardTitle } from './ui/Card'
@@ -6,6 +7,7 @@ import { Card, CardContent, CardTitle } from './ui/Card'
 const BeautifulChartsGrid = ({ data, dataType, timezone = 'UTC' }) => {
   const [animationKey, setAnimationKey] = useState(0)
 
+  const { t } = useTranslation()
   // Триггер анимации при смене данных
   useEffect(() => {
     setAnimationKey(prev => prev + 1)
@@ -456,10 +458,10 @@ const BeautifulChartsGrid = ({ data, dataType, timezone = 'UTC' }) => {
         </div>
         <div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-            Красивая Аналитика
+            Beautiful Analytics
           </h1>
           <p className="text-xl text-gray-300 mt-2">
-            Интерактивные графики и живая статистика • {timezone}
+            {t('charts.interactive')} • {timezone}
           </p>
         </div>
       </div>
@@ -468,33 +470,33 @@ const BeautifulChartsGrid = ({ data, dataType, timezone = 'UTC' }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
           {
-            title: 'Общий объем',
+            title: t('charts.totalVolume'),
             value: formatCurrency(stats.totalVolume),
-            subtitle: `${stats.totalOperations} операций`,
+            subtitle: `${stats.totalOperations} ${t('table.operations')}`,
             icon: DollarSign,
             gradient: 'from-blue-500 to-cyan-500',
             change: '+12.5%'
           },
           {
-            title: 'Успешные',
+            title: t('charts.successful'),
             value: formatCurrency(stats.successfulVolume),
-            subtitle: `${stats.successfulOperations} операций`,
+            subtitle: `${stats.successfulOperations} ${t('table.operations')}`,
             icon: TrendingUp,
             gradient: 'from-green-500 to-emerald-500',
             change: '+8.2%'
           },
           {
-            title: 'Конверсия',
+            title: t('charts.conversionRate'),
             value: `${stats.conversionRate.toFixed(1)}%`,
-            subtitle: 'Общая конверсия',
+            subtitle: t('charts.totalConversion'),
             icon: Target,
             gradient: 'from-purple-500 to-pink-500',
             change: '+2.1%'
           },
           {
-            title: 'Средний чек',
+            title: t('charts.averageCheck'),
             value: formatCurrency(stats.averageAmount),
-            subtitle: 'На операцию',
+            subtitle: t('charts.onOperation'),
             icon: Percent,
             gradient: 'from-orange-500 to-red-500',
             change: '+5.8%'
@@ -657,13 +659,13 @@ const BeautifulChartsGrid = ({ data, dataType, timezone = 'UTC' }) => {
                   <BarChart
                     data={[
                       {
-                        type: 'Депозиты',
+                        type: t('charts.deposits'),
                         volume: stats.deposits.successfulVolume,
                         count: stats.deposits.successful,
                         conversion: stats.deposits.conversionRate
                       },
                       {
-                        type: 'Выплаты',
+                        type: t('charts.withdrawals'),
                         volume: stats.withdrawals.successfulVolume,
                         count: stats.withdrawals.successful,
                         conversion: stats.withdrawals.conversionRate
@@ -698,7 +700,7 @@ const BeautifulChartsGrid = ({ data, dataType, timezone = 'UTC' }) => {
                       dataKey="volume"
                       fill={(entry, index) => index === 0 ? "url(#depositGradient)" : "url(#withdrawalGradient)"}
                       radius={[4, 4, 0, 0]}
-                      name="Объем"
+                      name={t('charts.volume')}
                     />
                   </BarChart>
                 </ResponsiveContainer>
@@ -762,7 +764,7 @@ const BeautifulChartsGrid = ({ data, dataType, timezone = 'UTC' }) => {
                       strokeWidth={3}
                       dot={{ fill: '#8B5CF6', strokeWidth: 2, r: 5 }}
                       activeDot={{ r: 7, stroke: '#8B5CF6', strokeWidth: 2, fill: '#FFFFFF' }}
-                      name="Объем"
+                      name={t('charts.volume')}
                     />
                     <Line 
                       type="monotone"
@@ -771,7 +773,7 @@ const BeautifulChartsGrid = ({ data, dataType, timezone = 'UTC' }) => {
                       strokeWidth={2}
                       strokeDasharray="5 5"
                       dot={{ fill: '#F59E0B', strokeWidth: 1, r: 3 }}
-                      name="Количество"
+                      name={t('charts.quantity')}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -831,7 +833,7 @@ const BeautifulChartsGrid = ({ data, dataType, timezone = 'UTC' }) => {
                       stroke="url(#fifteenMinGradient)"
                       fill="url(#fifteenMinAreaGradient)"
                       strokeWidth={3}
-                      name="Объем"
+                      name={t('charts.volume')}
                     />
                     <Line 
                       type="monotone"
@@ -840,7 +842,7 @@ const BeautifulChartsGrid = ({ data, dataType, timezone = 'UTC' }) => {
                       strokeWidth={2}
                       strokeDasharray="3 3"
                       dot={{ fill: '#F59E0B', strokeWidth: 1, r: 2 }}
-                      name="Транзакции"
+                      name={t('charts.transactions')}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -896,7 +898,7 @@ const BeautifulChartsGrid = ({ data, dataType, timezone = 'UTC' }) => {
                     strokeWidth={3}
                     dot={{ fill: '#F59E0B', strokeWidth: 2, r: 5 }}
                     activeDot={{ r: 7, stroke: '#F59E0B', strokeWidth: 2, fill: '#FFFFFF' }}
-                    name="Конверсия (%)"
+                    name={t('charts.conversion')}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -949,7 +951,7 @@ const BeautifulChartsGrid = ({ data, dataType, timezone = 'UTC' }) => {
                     dataKey="volume" 
                     fill="url(#dailyGradient)"
                     radius={[4, 4, 0, 0]}
-                    name="Объем"
+                    name={t('charts.volume')}
                   />
                 </BarChart>
               </ResponsiveContainer>

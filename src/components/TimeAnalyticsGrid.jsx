@@ -53,7 +53,7 @@ const TimeAnalyticsGrid = ({ data, metrics }) => {
         failed: stats.failed || 0,
         pending: stats.pending || 0,
         dayOfWeek: stats.dayOfWeek,
-        dayName: ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'][stats.dayOfWeek]
+        dayName: [t('weekdaysShort.sun'), t('weekdaysShort.mon'), t('weekdaysShort.tue'), t('weekdaysShort.wed'), t('weekdaysShort.thu'), t('weekdaysShort.fri'), t('weekdaysShort.sat')][stats.dayOfWeek]
       }))
       .sort((a, b) => new Date(a.date) - new Date(b.date))
       .slice(-30) // Показываем последние 30 дней
@@ -61,10 +61,10 @@ const TimeAnalyticsGrid = ({ data, metrics }) => {
 
   // Статистика по дням недели
   const weekdayStats = useMemo(() => {
-    const weekdays = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота']
+    const weekdays = [t('weekdays.sunday'), t('weekdays.monday'), t('weekdays.tuesday'), t('weekdays.wednesday'), t('weekdays.thursday'), t('weekdays.friday'), t('weekdays.saturday')]
     const stats = Array(7).fill().map((_, i) => ({
       day: weekdays[i],
-      shortDay: ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'][i],
+              shortDay: [t('weekdaysShort.sun'), t('weekdaysShort.mon'), t('weekdaysShort.tue'), t('weekdaysShort.wed'), t('weekdaysShort.thu'), t('weekdaysShort.fri'), t('weekdaysShort.sat')][i],
       transactions: 0,
       revenue: 0,
       successful: 0
@@ -195,7 +195,7 @@ const TimeAnalyticsGrid = ({ data, metrics }) => {
                   }}
                   formatter={(value, name) => [
                     name === 'transactions' ? value : formatCurrency(value),
-                    name === 'transactions' ? 'Транзакции' : 'Выручка'
+                    name === 'transactions' ? t('charts.transactions') : t('charts.revenue')
                   ]}
                 />
                 <Bar dataKey="transactions" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
@@ -229,7 +229,7 @@ const TimeAnalyticsGrid = ({ data, metrics }) => {
                   }}
                   formatter={(value, name) => [
                     name === 'transactions' ? value : formatCurrency(value),
-                    name === 'transactions' ? 'Транзакции' : 'Выручка'
+                    name === 'transactions' ? t('charts.transactions') : t('charts.revenue')
                   ]}
                 />
                 <Line 

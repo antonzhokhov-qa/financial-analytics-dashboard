@@ -5,10 +5,13 @@ import APIFilters from './components/APIFilters'
 import EnhancedAPIFilters from './components/EnhancedAPIFilters'
 import EnhancedDataTable from './components/EnhancedDataTable'
 import ReconciliationDashboard from './components/ReconciliationDashboard'
+import LanguageSwitcher from './components/LanguageSwitcher'
+import { LanguageProvider, useTranslation } from './contexts/LanguageContext'
 import { normalizeAPIData } from './utils/apiService'
 import './index.css'
 
 function App() {
+  const { t } = useTranslation()
   console.log('App component rendering...')
   
   const [currentView, setCurrentView] = useState('selector') // 'selector', 'csv', 'api', 'enhanced-api', 'dashboard', 'enhanced-dashboard', 'reconciliation'
@@ -111,7 +114,7 @@ function App() {
               onClick={handleBackToSelector}
               className="px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors duration-200"
             >
-              ← Назад к выбору источника
+              ← {t('filters.backToSource')}
             </button>
           </div>
           <EnhancedDataTable data={enhancedApiData} />
@@ -125,7 +128,7 @@ function App() {
               onClick={handleBackToSelector}
               className="px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors duration-200"
             >
-              ← Назад к выбору источника
+              ← {t('filters.backToSource')}
             </button>
           </div>
           <ReconciliationDashboard />
@@ -135,4 +138,13 @@ function App() {
   )
 }
 
-export default App 
+// Оборачиваем App в LanguageProvider
+const AppWithLanguage = () => {
+  return (
+    <LanguageProvider>
+      <App />
+    </LanguageProvider>
+  )
+}
+
+export default AppWithLanguage 

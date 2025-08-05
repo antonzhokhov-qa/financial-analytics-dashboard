@@ -97,8 +97,8 @@ function PredictiveAnalytics({ data, metrics }) {
             <div key={index} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
               <div className="flex items-center gap-3">
                 <div className={`w-3 h-3 rounded-full ${
-                  risk.impact === 'Высокий' ? 'bg-red-400' :
-                  risk.impact === 'Средний' ? 'bg-yellow-400' : 'bg-green-400'
+                                      risk.impact === t('analytics.high') ? 'bg-red-400' :
+                    risk.impact === t('analytics.medium') ? 'bg-yellow-400' : 'bg-green-400'
                 }`} />
                 <span className="text-white font-medium">{risk.factor}</span>
               </div>
@@ -129,9 +129,9 @@ function PredictiveAnalytics({ data, metrics }) {
                     {rec.impact} эффект
                   </span>
                   <span className={`px-2 py-1 rounded text-xs ${
-                    rec.effort === 'Высокий' ? 'bg-red-500/20 text-red-300' :
-                    rec.effort === 'Средний' ? 'bg-yellow-500/20 text-yellow-300' :
-                    'bg-green-500/20 text-green-300'
+                                      rec.effort === t('analytics.high') ? 'bg-red-500/20 text-red-300' :
+                  rec.effort === t('analytics.medium') ? 'bg-yellow-500/20 text-yellow-300' :
+                  'bg-green-500/20 text-green-300'
                   }`}>
                     {rec.effort} усилия
                   </span>

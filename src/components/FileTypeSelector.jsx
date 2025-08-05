@@ -124,7 +124,7 @@ const FileTypeSelector = ({ onTypeSelect, onBack }) => {
         {/* Подсказка */}
         <div className="text-center">
           <p className="text-sm text-gray-400">
-            💡 Не уверены в источнике? Выберите "Выгрузка от провайдера" для новых форматов с расширенными полями
+            💡 {t('analytics.providerExportTip')}
           </p>
         </div>
       </div>

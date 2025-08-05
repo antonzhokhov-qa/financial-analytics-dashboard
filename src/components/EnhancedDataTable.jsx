@@ -3,8 +3,10 @@ import { ChevronDown, ChevronUp, Search, Filter, Download, ExternalLink, User, C
 import { Card, CardContent } from './ui/Card'
 import { calculateEnhancedMetrics } from '../utils/analytics'
 import MetricsGrid from './MetricsGrid'
+import { useTranslation } from '../contexts/LanguageContext'
 
 const EnhancedDataTable = ({ data }) => {
+  const { t } = useTranslation()
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
@@ -19,12 +21,39 @@ const EnhancedDataTable = ({ data }) => {
   })
   const [metrics, setMetrics] = useState(null)
 
-  // Вычисляем метрики с поддержкой мультивалютности
+  // Вычисляем метрики с поддержкой мультивалютности и USD конвертации
   useEffect(() => {
     if (data && data.length > 0) {
-      const enhancedMetrics = calculateEnhancedMetrics(data, 'enhanced-api')
-      setMetrics(enhancedMetrics)
-      console.log('📊 Enhanced metrics calculated:', enhancedMetrics)
+      const calculateMetricsAsync = async () => {
+        try {
+          console.log('🔄 Запускаем расчет метрик с конвертацией валют...')
+          const enhancedMetrics = await calculateEnhancedMetrics(data, 'enhanced-api')
+          setMetrics(enhancedMetrics)
+          console.log('📊 Enhanced metrics calculated with USD conversion:', enhancedMetrics)
+        } catch (error) {
+          console.error('❌ Ошибка расчета метрик:', error)
+          // Fallback - пытаемся синхронно без USD конвертации
+          try {
+            const basicMetrics = {
+              total: data.length,
+              successful: data.filter(item => item.isCompleted).length,
+              failed: data.filter(item => item.isFailed).length,
+              totalAmount: data.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0),
+              currency: 'TRY',
+              isMultiCurrency: false
+            }
+            setMetrics(basicMetrics)
+            console.log('⚠️ Используем базовые метрики из-за ошибки:', basicMetrics)
+          } catch (fallbackError) {
+            console.error('❌ Ошибка в fallback метриках:', fallbackError)
+            setMetrics(null)
+          }
+        }
+      }
+      
+      calculateMetricsAsync()
+    } else {
+      setMetrics(null)
     }
   }, [data])
 
@@ -185,9 +214,9 @@ const EnhancedDataTable = ({ data }) => {
     <div className="max-w-7xl mx-auto space-y-6">
       {/* Заголовок */}
       <div className="text-center">
-        <h1 className="text-4xl font-bold text-white mb-2">Расширенный API анализ</h1>
+        <h1 className="text-4xl font-bold text-white mb-2">{t('table.enhancedApiAnalysis')}</h1>
         <p className="text-gray-300">
-          Данные платформы с поддержкой мультивалютности • {data.length} операций
+          {t('table.platformDataMulticurrency')} • {data.length} {t('table.operations')}
         </p>
       </div>
 
@@ -203,9 +232,9 @@ const EnhancedDataTable = ({ data }) => {
       {/* Переключатели видов */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white">Данные операций</h2>
+          <h2 className="text-2xl font-bold text-white">{t('table.operationsData')}</h2>
           <p className="text-gray-300">
-            {searchFilteredData.length} операций из {data.length} • Поддержка криптовалют и детальной информации
+            {searchFilteredData.length} {t('table.operations')} из {data.length} • {t('table.cryptoSupport')}
           </p>
         </div>
         
@@ -231,21 +260,21 @@ const EnhancedDataTable = ({ data }) => {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { 
-            label: 'Всего операций', 
+            label: t('metrics.totalOperations'), 
             value: data.length, 
             color: 'text-blue-400',
             icon: Globe 
           },
           { 
-            label: 'Успешные', 
+            label: t('metrics.successful'), 
             value: data.filter(d => d.isCompleted).length, 
             color: 'text-green-400',
             icon: Shield 
           },
           { 
-            label: metrics?.isMultiCurrency ? 'Суммы по валютам' : 'Сумма успешных', 
+            label: metrics?.isMultiCurrency ? t('metrics.sumsBycurrencies') : t('metrics.successfulSum'), 
             value: metrics?.isMultiCurrency ? 
-              `${metrics.currencyCount} валют` :
+              `${metrics.currencyCount} ${t('metrics.multiCurrency')}` :
               formatCurrency(
                 data
                   .filter(d => d.isCompleted)
@@ -257,7 +286,7 @@ const EnhancedDataTable = ({ data }) => {
             isAmount: true
           },
           { 
-            label: 'В процессе/Ошибка', 
+            label: t('metrics.inProcessOrError'), 
             value: data.filter(d => !d.isCompleted).length, 
             color: 'text-yellow-400',
             icon: ExternalLink 
@@ -288,7 +317,7 @@ const EnhancedDataTable = ({ data }) => {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Поиск по ID, статусу, проекту, пользователю..."
+            placeholder={t('table.searchPlaceholder')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -299,13 +328,13 @@ const EnhancedDataTable = ({ data }) => {
           <div className="flex items-center space-x-2">
             <Filter className="w-4 h-4 text-gray-400" />
             <span className="text-sm text-gray-400">
-              {searchFilteredData.length} результатов
+              {searchFilteredData.length} {t('table.results')}
             </span>
           </div>
           
           <button className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 flex items-center space-x-2">
             <Download className="w-4 h-4" />
-            <span>Экспорт</span>
+            <span>{t('table.export')}</span>
           </button>
         </div>
       </div>
@@ -318,7 +347,7 @@ const EnhancedDataTable = ({ data }) => {
               <tr>
                 <th className="px-4 py-4 text-left text-sm font-semibold text-white">
                   <div className="flex items-center space-x-2">
-                    <span>Детали</span>
+                    <span>{t('table.details')}</span>
                   </div>
                 </th>
                 <th 

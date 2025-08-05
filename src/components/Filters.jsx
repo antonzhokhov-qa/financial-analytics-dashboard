@@ -368,7 +368,7 @@ const Filters = ({ data, filters, onFiltersChange, dataType = 'merchant' }) => {
               </label>
               <input
                 type="number"
-                placeholder="Без ограничений"
+                placeholder={t('analytics.noLimits')}
                 value={localFilters.amountRange.max}
                 onChange={(e) => setLocalFilters(prev => ({ 
                   ...prev, 

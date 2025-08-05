@@ -3,8 +3,10 @@ import { enhancedAPI, normalizeEnhancedData } from '../utils/enhancedApiService'
 import { Search, Calendar, Database, CreditCard, Globe, Coins, Filter, RefreshCw, ChevronDown, Activity } from 'lucide-react'
 import { Card, CardContent, CardTitle } from './ui/Card'
 import { Button } from './ui/Button'
+import { useTranslation } from '../contexts/LanguageContext'
 
 const EnhancedAPIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) => {
+  const { t } = useTranslation()
   const [filters, setFilters] = useState({
     // Базовые фильтры
     project_id: '',
@@ -213,21 +215,23 @@ const EnhancedAPIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
       <div className="w-full max-w-6xl space-y-8">
+
+
         {/* Заголовок */}
         <div className="text-center space-y-4">
           <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center mx-auto">
             <Globe className="w-10 h-10 text-white" />
           </div>
-          <h1 className="text-4xl font-bold text-white">Расширенный интерфейс API</h1>
+          <h1 className="text-4xl font-bold text-white">{t('api.enhancedAPI')}</h1>
           <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-            Удобный интерфейс для работы с API коллектора с расширенными возможностями фильтрации
+            {t('filters.interfaceCapabilities')}
           </p>
           {onBack && (
             <button
               onClick={onBack}
               className="mt-4 px-6 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors duration-200"
             >
-              ← Назад к выбору источника
+              ← {t('filters.backToSource')}
             </button>
           )}
         </div>
@@ -411,7 +415,7 @@ const EnhancedAPIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) 
                 className="px-8"
               >
                 <RefreshCw className="w-5 h-5 mr-2" />
-                Загрузить данные
+                {t('filters.loadData')}
               </Button>
             </div>
 
@@ -429,27 +433,27 @@ const EnhancedAPIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) 
           <CardContent className="p-6">
             <CardTitle className="mb-4 flex items-center gap-2">
               <Activity className="w-5 h-5 text-purple-400" />
-              Возможности интерфейса
+              {t('filters.interfaceCapabilities')}
             </CardTitle>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-gray-300">
               <div>
-                <h4 className="font-medium text-white mb-2">📊 Улучшенная аналитика</h4>
+                <h4 className="font-medium text-white mb-2">📊 {t('filters.enhancedAnalytics')}</h4>
                 <ul className="space-y-1 text-xs">
-                  <li>• Горизонтальные графики объемов</li>
-                  <li>• Анализ конверсии по времени</li>
-                  <li>• Детальная таблица с поиском</li>
-                  <li>• Расширенная статистика</li>
+                  <li>• Horizontal volume charts</li>
+                  <li>• Time-based conversion analysis</li>
+                  <li>• Detailed searchable table</li>
+                  <li>• Extended statistics</li>
                 </ul>
               </div>
               
               <div>
-                <h4 className="font-medium text-white mb-2">🔍 Удобная фильтрация</h4>
+                <h4 className="font-medium text-white mb-2">🔍 {t('filters.convenientFiltering')}</h4>
                 <ul className="space-y-1 text-xs">
-                  <li>• Быстрые предустановки</li>
-                  <li>• Фильтр по проектам и статусам</li>
-                  <li>• Гибкие диапазоны дат</li>
-                  <li>• Сортировка и пагинация</li>
+                  <li>• Quick presets</li>
+                  <li>• Filter by projects and statuses</li>
+                  <li>• Flexible date ranges</li>
+                  <li>• Sorting and pagination</li>
                 </ul>
               </div>
             </div>

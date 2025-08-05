@@ -6,7 +6,7 @@ function TimeRangeSelector({ selectedRange, onRangeChange }) {
     { id: '7d', label: '7 дней', icon: Calendar },
     { id: '30d', label: '30 дней', icon: Calendar },
     { id: '90d', label: '90 дней', icon: Calendar },
-    { id: 'all', label: 'Все время', icon: Calendar }
+    { id: 'all', label: t('timePeriods.allTime'), icon: Calendar }
   ]
 
   return (
@@ -34,7 +34,7 @@ function TimeRangeSelector({ selectedRange, onRangeChange }) {
         <div className="bg-white/5 rounded-lg p-4">
           <div className="text-white/70 text-sm mb-1">Период анализа</div>
           <div className="text-white font-medium">
-            {ranges.find(r => r.id === selectedRange)?.label || 'Все время'}
+            {ranges.find(r => r.id === selectedRange)?.label || t('timePeriods.allTime')}
           </div>
         </div>
         

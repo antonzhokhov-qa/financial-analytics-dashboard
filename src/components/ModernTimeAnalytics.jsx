@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Clock, Calendar, TrendingUp, Activity, BarChart3, Timer } from 'lucide-react'
 
 const ModernTimeAnalytics = ({ data, timezone = 'UTC' }) => {
+  const { t } = useTranslation()
   const [selectedPeriod, setSelectedPeriod] = useState('24h')
   const [hoveredHour, setHoveredHour] = useState(null)
 
@@ -136,9 +137,9 @@ const ModernTimeAnalytics = ({ data, timezone = 'UTC' }) => {
         
         <div className="flex items-center gap-2 bg-white/5 rounded-xl p-1 border border-white/10">
           {[
-            { id: '24h', label: '24 часа', icon: Clock },
-            { id: '7d', label: '7 дней', icon: Calendar },
-            { id: 'peaks', label: 'Пики', icon: TrendingUp }
+            { id: '24h', label: t('timePeriods.twentyFourHours'), icon: Clock },
+            { id: '7d', label: t('timePeriods.sevenDays'), icon: Calendar },
+            { id: 'peaks', label: t('charts.peaks'), icon: TrendingUp }
           ].map(({ id, label, icon: Icon }) => (
             <button
               key={id}

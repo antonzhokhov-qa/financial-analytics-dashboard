@@ -1,48 +1,51 @@
 import { useState } from 'react'
 import { Upload, Globe, Database, FileText } from 'lucide-react'
+import LanguageSwitcher from './LanguageSwitcher'
+import { useTranslation } from '../contexts/LanguageContext'
 
 const DataSourceSelector = ({ onSourceChange, currentSource, onReconciliationClick }) => {
+  const { t } = useTranslation()
   const [selectedSource, setSelectedSource] = useState(currentSource || 'csv')
 
   const sources = [
     {
       id: 'csv',
-      title: 'Загрузка CSV файла',
-      description: 'Анализ данных от провайдера из CSV файла',
+      title: t('dataSources.csvUpload'),
+      description: t('dataSources.csvDescription'),
       icon: Upload,
       color: 'from-blue-500 to-cyan-600',
       features: [
-        'Детальный анализ транзакций',
-        'Поддержка больших файлов',
-        'Историческая аналитика',
-        'Данные от провайдера'
+        t('dataSources.features.detailedAnalysis'),
+        t('dataSources.features.largeFileSupport'),
+        t('dataSources.features.historicalAnalytics'),
+        t('dataSources.features.providerData')
       ]
     },
     {
       id: 'api',
-      title: 'API платформы',
-      description: 'Получение актуальных данных через API коллектора',
+      title: t('dataSources.platformAPI'),
+      description: t('dataSources.platformDescription'),
       icon: Globe,
       color: 'from-green-500 to-emerald-600',
       features: [
-        'Актуальная информация',
-        'Фильтрация по проектам',
-        'Реальное время',
-        'Данные платформы'
+        t('dataSources.features.realTimeInfo'),
+        t('dataSources.features.projectFiltering'),
+        t('dataSources.features.liveData'),
+        t('dataSources.features.platformData')
       ]
     },
     {
       id: 'enhanced-api',
-      title: 'Расширенный API 🚀',
-      description: 'Новые возможности коллектора: криптовалюты, информация о картах',
+      title: t('dataSources.enhancedAPI'),
+      description: t('dataSources.enhancedDescription'),
       icon: Database,
       color: 'from-purple-500 to-pink-600',
       features: [
-        '💰 Поддержка криптовалют',
-        '💳 Детальная информация о картах',
-        '💱 Валютные курсы',
-        '🛡️ 3D Secure данные',
-        '🌍 IP геолокация'
+        '💰 ' + t('dataSources.features.cryptoSupport'),
+        '💳 ' + t('dataSources.features.cardInfo'),
+        '💱 ' + t('dataSources.features.currencyRates'),
+        '🛡️ ' + t('dataSources.features.secureData'),
+        '🌍 ' + t('dataSources.features.geolocation')
       ],
       isNew: true
     }
@@ -56,14 +59,21 @@ const DataSourceSelector = ({ onSourceChange, currentSource, onReconciliationCli
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
       <div className="w-full max-w-6xl space-y-8">
+        {/* Панель управления */}
+        <div className="flex justify-end">
+          <LanguageSwitcher variant="compact" />
+        </div>
+
         {/* Заголовок */}
         <div className="text-center space-y-4">
           <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto">
             <Database className="w-10 h-10 text-white" />
           </div>
-          <h1 className="text-4xl font-bold text-white">Выберите источник данных</h1>
+          <h1 className="text-4xl font-bold text-white">
+            {t('navigation.selectDataSource')}
+          </h1>
           <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-            Выберите способ получения данных для аналитики финансовых операций
+            {t('navigation.chooseDataMethod')}
           </p>
         </div>
 

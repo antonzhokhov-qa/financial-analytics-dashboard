@@ -22,23 +22,23 @@ const VirtualizedDataTable = ({
       return [
         { key: 'id', label: 'ID операции', width: '150px', sortable: true },
         { key: 'foreignOperationId', label: 'Foreign ID', width: '200px', sortable: true },
-        { key: 'status', label: 'Статус', width: '120px', sortable: true },
-        { key: 'amount', label: 'Сумма', width: '120px', sortable: true, type: 'currency' },
-        { key: 'createdAt', label: 'Дата создания', width: '180px', sortable: true, type: 'date' },
-        { key: 'method', label: 'Метод', width: '150px', sortable: true },
-        { key: 'currency', label: 'Валюта', width: '80px', sortable: true }
+            { key: 'status', label: t('columns.status'), width: '120px', sortable: true },
+    { key: 'amount', label: t('columns.amount'), width: '120px', sortable: true, type: 'currency' },
+    { key: 'createdAt', label: t('columns.createdAt'), width: '180px', sortable: true, type: 'date' },
+    { key: 'method', label: t('columns.method'), width: '150px', sortable: true },
+    { key: 'currency', label: t('columns.currency'), width: '80px', sortable: true }
       ]
     } else {
       // Merchant данные
       return [
         { key: 'trackingId', label: 'Tracking ID', width: '200px', sortable: true },
-        { key: 'status', label: 'Статус', width: '120px', sortable: true },
-        { key: 'amount', label: 'Сумма', width: '120px', sortable: true, type: 'currency' },
-        { key: 'paymentMethod', label: 'Метод оплаты', width: '150px', sortable: true },
-        { key: 'company', label: 'Компания', width: '150px', sortable: true },
-        { key: 'createdAt', label: 'Дата создания', width: '180px', sortable: true, type: 'date' },
-        { key: 'currency', label: 'Валюта', width: '80px', sortable: true },
-        { key: 'provider', label: 'Провайдер', width: '100px', sortable: true }
+            { key: 'status', label: t('columns.status'), width: '120px', sortable: true },
+    { key: 'amount', label: t('columns.amount'), width: '120px', sortable: true, type: 'currency' },
+    { key: 'paymentMethod', label: t('columns.paymentMethod'), width: '150px', sortable: true },
+    { key: 'company', label: t('columns.company'), width: '150px', sortable: true },
+    { key: 'createdAt', label: t('columns.createdAt'), width: '180px', sortable: true, type: 'date' },
+    { key: 'currency', label: t('columns.currency'), width: '80px', sortable: true },
+    { key: 'provider', label: t('columns.provider'), width: '100px', sortable: true }
       ]
     }
   }, [dataType])
@@ -211,7 +211,7 @@ const VirtualizedDataTable = ({
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/40" />
             <input
               type="text"
-              placeholder="Поиск..."
+              placeholder={t('table.searchPlaceholderShort')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 pr-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
@@ -328,7 +328,7 @@ const VirtualizedDataTable = ({
           <div className="text-center py-12">
             <div className="text-white/40 text-lg mb-2">📭</div>
             <p className="text-white/60">
-              {searchTerm || filterStatus ? 'Нет данных, соответствующих фильтрам' : 'Нет данных для отображения'}
+              {searchTerm || filterStatus ? t('table.noDataFiltered') : t('table.noDataDisplay')}
             </p>
           </div>
         )}

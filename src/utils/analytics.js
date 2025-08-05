@@ -1,3 +1,5 @@
+import currencyService from './currencyService.js'
+
 // Функция расчета метрик с поддержкой провайдеров
 export const calculateMetrics = (data, dataTypeOrProvider = 'merchant') => {
   if (!data || data.length === 0) return null
@@ -455,7 +457,7 @@ export function detectAnomalies(data) {
 } 
 
 // Расширенная функция расчета метрик для Enhanced API с поддержкой мультивалютности
-export const calculateEnhancedMetrics = (data, dataSource = 'enhanced-api') => {
+export const calculateEnhancedMetrics = async (data, dataSource = 'enhanced-api') => {
   if (!data || data.length === 0) return null
 
   console.log('🚀 Расчет расширенных метрик для Enhanced API:', {
@@ -464,13 +466,30 @@ export const calculateEnhancedMetrics = (data, dataSource = 'enhanced-api') => {
     sampleData: data.slice(0, 2)
   })
 
+  // Конвертируем все операции в USD
+  console.log('💱 Начинаем конвертацию валют в USD...')
+  const dataWithUSD = await currencyService.convertOperationsToUSD(data)
+
   // Анализ валют в данных
   const currencyBreakdown = {}
   const merchantBreakdown = {}
+  const operationTypeBreakdown = {
+    deposit: { total: 0, successful: 0, failed: 0, pending: 0, totalAmount: 0, successfulRevenue: 0, totalUSD: 0, successfulUSD: 0 },
+    withdraw: { total: 0, successful: 0, failed: 0, pending: 0, totalAmount: 0, successfulRevenue: 0, totalUSD: 0, successfulUSD: 0 },
+    unknown: { total: 0, successful: 0, failed: 0, pending: 0, totalAmount: 0, successfulRevenue: 0, totalUSD: 0, successfulUSD: 0 }
+  }
   
-  data.forEach(item => {
+  dataWithUSD.forEach(item => {
     const currency = item.currency || 'UNKNOWN'
     const merchant = item.project || item.company || 'UNKNOWN'
+    const amount = parseFloat(item.amount) || 0
+    const usdAmount = parseFloat(item.usdAmount) || 0
+    
+    // Определяем тип операции
+    const operationType = item.isDeposit ? 'deposit' : 
+                         item.isWithdraw ? 'withdraw' : 
+                         item.transactionDirection === 'deposit' ? 'deposit' :
+                         item.transactionDirection === 'withdraw' ? 'withdraw' : 'unknown'
     
     // Анализ по валютам
     if (!currencyBreakdown[currency]) {
@@ -482,21 +501,61 @@ export const calculateEnhancedMetrics = (data, dataSource = 'enhanced-api') => {
         totalAmount: 0,
         successfulRevenue: 0,
         lostRevenue: 0,
-        merchants: new Set()
+        totalUSD: 0,
+        successfulUSD: 0,
+        merchants: new Set(),
+        deposits: 0,
+        withdraws: 0,
+        // Детальная информация по депозитам
+        depositsAmount: 0,
+        depositsSuccessful: 0,
+        depositsRevenue: 0,
+        depositsUSD: 0,
+        depositsRevenueUSD: 0,
+        // Детальная информация по выплатам  
+        withdrawsAmount: 0,
+        withdrawsSuccessful: 0,
+        withdrawsRevenue: 0,
+        withdrawsUSD: 0,
+        withdrawsRevenueUSD: 0
       }
     }
     
     const currencyData = currencyBreakdown[currency]
     currencyData.total++
-    currencyData.totalAmount += parseFloat(item.amount) || 0
+    currencyData.totalAmount += amount
+    currencyData.totalUSD += usdAmount
     currencyData.merchants.add(merchant)
+    
+    // Обновляем типы операций с детальной информацией
+    if (operationType === 'deposit') {
+      currencyData.deposits++
+      currencyData.depositsAmount += amount
+      currencyData.depositsUSD += usdAmount
+      if (item.isCompleted) {
+        currencyData.depositsSuccessful++
+        currencyData.depositsRevenue += amount
+        currencyData.depositsRevenueUSD += usdAmount
+      }
+    }
+    if (operationType === 'withdraw') {
+      currencyData.withdraws++
+      currencyData.withdrawsAmount += amount
+      currencyData.withdrawsUSD += usdAmount
+      if (item.isCompleted) {
+        currencyData.withdrawsSuccessful++
+        currencyData.withdrawsRevenue += amount
+        currencyData.withdrawsRevenueUSD += usdAmount
+      }
+    }
     
     if (item.isCompleted) {
       currencyData.successful++
-      currencyData.successfulRevenue += parseFloat(item.amount) || 0
+      currencyData.successfulRevenue += amount
+      currencyData.successfulUSD += usdAmount
     } else if (item.isFailed) {
       currencyData.failed++
-      currencyData.lostRevenue += parseFloat(item.amount) || 0
+      currencyData.lostRevenue += amount
     } else if (item.isInProcess) {
       currencyData.pending++
     }
@@ -510,22 +569,77 @@ export const calculateEnhancedMetrics = (data, dataSource = 'enhanced-api') => {
         pending: 0,
         totalAmount: 0,
         successfulRevenue: 0,
-        currencies: new Set()
+        totalUSD: 0,
+        successfulUSD: 0,
+        currencies: new Set(),
+        deposits: 0,
+        withdraws: 0,
+        depositsAmount: 0,
+        withdrawsAmount: 0,
+        depositsUSD: 0,
+        withdrawsUSD: 0,
+        depositsSuccessful: 0,
+        withdrawsSuccessful: 0,
+        // Добавляем выручку по депозитам и выплатам
+        depositsRevenue: 0,
+        withdrawsRevenue: 0,
+        depositsRevenueUSD: 0,
+        withdrawsRevenueUSD: 0
       }
     }
     
     const merchantData = merchantBreakdown[merchant]
     merchantData.total++
-    merchantData.totalAmount += parseFloat(item.amount) || 0
+    merchantData.totalAmount += amount
+    merchantData.totalUSD += usdAmount
     merchantData.currencies.add(currency)
+    
+    // Обновляем типы операций с суммами
+    if (operationType === 'deposit') {
+      merchantData.deposits++
+      merchantData.depositsAmount += amount
+      merchantData.depositsUSD += usdAmount
+      if (item.isCompleted) {
+        merchantData.depositsSuccessful++
+        merchantData.depositsRevenue += amount
+        merchantData.depositsRevenueUSD += usdAmount
+      }
+    }
+    if (operationType === 'withdraw') {
+      merchantData.withdraws++
+      merchantData.withdrawsAmount += amount
+      merchantData.withdrawsUSD += usdAmount
+      if (item.isCompleted) {
+        merchantData.withdrawsSuccessful++
+        merchantData.withdrawsRevenue += amount
+        merchantData.withdrawsRevenueUSD += usdAmount
+      }
+    }
     
     if (item.isCompleted) {
       merchantData.successful++
-      merchantData.successfulRevenue += parseFloat(item.amount) || 0
+      merchantData.successfulRevenue += amount
+      merchantData.successfulUSD += usdAmount
     } else if (item.isFailed) {
       merchantData.failed++
     } else if (item.isInProcess) {
       merchantData.pending++
+    }
+    
+    // Анализ по типам операций
+    const opTypeData = operationTypeBreakdown[operationType]
+    opTypeData.total++
+    opTypeData.totalAmount += amount
+    opTypeData.totalUSD += usdAmount
+    
+    if (item.isCompleted) {
+      opTypeData.successful++
+      opTypeData.successfulRevenue += amount
+      opTypeData.successfulUSD += usdAmount
+    } else if (item.isFailed) {
+      opTypeData.failed++
+    } else if (item.isInProcess) {
+      opTypeData.pending++
     }
   })
 
@@ -541,11 +655,17 @@ export const calculateEnhancedMetrics = (data, dataSource = 'enhanced-api') => {
     currencyBreakdown[a].total > currencyBreakdown[b].total ? a : b
   ) || 'TRY'
 
-  // Общие суммы
+  // Общие суммы в оригинальных валютах
   const totalAmount = data.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0)
   const successfulRevenue = data.filter(item => item.isCompleted)
     .reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0)
   const averageAmount = total > 0 ? totalAmount / total : 0
+
+  // Общие суммы в USD
+  const totalUSD = dataWithUSD.reduce((sum, item) => sum + (parseFloat(item.usdAmount) || 0), 0)
+  const successfulUSD = dataWithUSD.filter(item => item.isCompleted)
+    .reduce((sum, item) => sum + (parseFloat(item.usdAmount) || 0), 0)
+  const averageUSD = total > 0 ? totalUSD / total : 0
 
   console.log('💰 Анализ валют в Enhanced API:', {
     mainCurrency: mainCurrency,
@@ -568,40 +688,147 @@ export const calculateEnhancedMetrics = (data, dataSource = 'enhanced-api') => {
     canceled: 0, // В Enhanced API обычно нет отмененных
     conversionRate,
     
-    // Финансовые метрики  
+    // Финансовые метрики в оригинальных валютах
     totalAmount,
     successfulRevenue,
     lostRevenue: totalAmount - successfulRevenue,
     averageAmount,
     totalFees: 0, // Пока не обрабатываем комиссии в Enhanced API
     
+    // Финансовые метрики в USD
+    totalUSD,
+    successfulUSD,
+    lostUSD: totalUSD - successfulUSD,
+    averageUSD,
+    
     // Валюта и тип данных
     currency: mainCurrency,
     dataType: 'enhanced-api',
     provider: 'enhanced-api',
     
-    // Расширенная аналитика
+    // Расширенная аналитика по валютам
     currencyBreakdown: Object.keys(currencyBreakdown).map(currency => ({
       currency,
       ...currencyBreakdown[currency],
       merchants: Array.from(currencyBreakdown[currency].merchants),
       conversionRate: currencyBreakdown[currency].total > 0 
         ? (currencyBreakdown[currency].successful / currencyBreakdown[currency].total * 100).toFixed(2) + '%'
+        : '0%',
+      totalUSDFormatted: new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(currencyBreakdown[currency].totalUSD),
+      successfulUSDFormatted: new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(currencyBreakdown[currency].successfulUSD),
+      // Форматирование депозитов
+      depositsUSDFormatted: new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(currencyBreakdown[currency].depositsUSD),
+      depositsRevenueUSDFormatted: new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(currencyBreakdown[currency].depositsRevenueUSD),
+      // Форматирование выплат
+      withdrawsUSDFormatted: new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(currencyBreakdown[currency].withdrawsUSD),
+      withdrawsRevenueUSDFormatted: new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(currencyBreakdown[currency].withdrawsRevenueUSD),
+      // Проценты
+      depositPercentage: currencyBreakdown[currency].total > 0 
+        ? (currencyBreakdown[currency].deposits / currencyBreakdown[currency].total * 100).toFixed(1) + '%'
+        : '0%',
+      withdrawPercentage: currencyBreakdown[currency].total > 0
+        ? (currencyBreakdown[currency].withdraws / currencyBreakdown[currency].total * 100).toFixed(1) + '%'
         : '0%'
     })),
     
+    // Расширенная аналитика по мерчантам
     merchantBreakdown: Object.keys(merchantBreakdown).map(merchant => ({
       merchant,
       ...merchantBreakdown[merchant],
       currencies: Array.from(merchantBreakdown[merchant].currencies),
       conversionRate: merchantBreakdown[merchant].total > 0
         ? (merchantBreakdown[merchant].successful / merchantBreakdown[merchant].total * 100).toFixed(2) + '%' 
+        : '0%',
+      totalUSDFormatted: new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(merchantBreakdown[merchant].totalUSD),
+      successfulUSDFormatted: new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(merchantBreakdown[merchant].successfulUSD),
+      depositsUSDFormatted: new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(merchantBreakdown[merchant].depositsUSD),
+      withdrawsUSDFormatted: new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(merchantBreakdown[merchant].withdrawsUSD),
+      // Форматирование выручки по депозитам и выплатам
+      depositsRevenueUSDFormatted: new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(merchantBreakdown[merchant].depositsRevenueUSD),
+      withdrawsRevenueUSDFormatted: new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(merchantBreakdown[merchant].withdrawsRevenueUSD),
+      depositPercentage: merchantBreakdown[merchant].total > 0
+        ? (merchantBreakdown[merchant].deposits / merchantBreakdown[merchant].total * 100).toFixed(1) + '%'
+        : '0%',
+      withdrawPercentage: merchantBreakdown[merchant].total > 0
+        ? (merchantBreakdown[merchant].withdraws / merchantBreakdown[merchant].total * 100).toFixed(1) + '%'
         : '0%'
     })),
     
-    // Статистика мультивалютности
+    // Новая аналитика по типам операций
+    operationTypeBreakdown: Object.keys(operationTypeBreakdown).map(type => ({
+      type,
+      label: type === 'deposit' ? 'Депозиты' : type === 'withdraw' ? 'Выплаты' : 'Неизвестно',
+      ...operationTypeBreakdown[type],
+      conversionRate: operationTypeBreakdown[type].total > 0
+        ? (operationTypeBreakdown[type].successful / operationTypeBreakdown[type].total * 100).toFixed(2) + '%'
+        : '0%',
+      totalUSDFormatted: new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(operationTypeBreakdown[type].totalUSD),
+      successfulUSDFormatted: new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(operationTypeBreakdown[type].successfulUSD),
+      percentage: total > 0
+        ? (operationTypeBreakdown[type].total / total * 100).toFixed(1) + '%'
+        : '0%'
+    })),
+    
+    // Статистика мультивалютности и типов операций
     isMultiCurrency: Object.keys(currencyBreakdown).length > 1,
+    hasMultipleOperationTypes: operationTypeBreakdown.deposit.total > 0 && operationTypeBreakdown.withdraw.total > 0,
     currencyCount: Object.keys(currencyBreakdown).length,
-    merchantCount: Object.keys(merchantBreakdown).length
+    merchantCount: Object.keys(merchantBreakdown).length,
+    
+    // Общие статистики по типам операций
+    totalDeposits: operationTypeBreakdown.deposit.total,
+    totalWithdraws: operationTypeBreakdown.withdraw.total,
+    depositsUSD: operationTypeBreakdown.deposit.totalUSD,
+    withdrawsUSD: operationTypeBreakdown.withdraw.totalUSD,
+    depositsSuccessfulUSD: operationTypeBreakdown.deposit.successfulUSD,
+    withdrawsSuccessfulUSD: operationTypeBreakdown.withdraw.successfulUSD,
+    depositsAmount: operationTypeBreakdown.deposit.totalAmount,
+    withdrawsAmount: operationTypeBreakdown.withdraw.totalAmount,
+    depositsSuccessfulAmount: operationTypeBreakdown.deposit.successfulRevenue,
+    withdrawsSuccessfulAmount: operationTypeBreakdown.withdraw.successfulRevenue,
+    depositsPercentage: total > 0 ? (operationTypeBreakdown.deposit.total / total * 100).toFixed(1) + '%' : '0%',
+    withdrawsPercentage: total > 0 ? (operationTypeBreakdown.withdraw.total / total * 100).toFixed(1) + '%' : '0%'
   }
 } 

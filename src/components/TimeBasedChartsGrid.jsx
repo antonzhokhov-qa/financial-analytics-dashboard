@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Calendar, Clock, TrendingUp, BarChart3, Activity } from 'lucide-react'
 
 const TimeBasedChartsGrid = ({ data, timezone = 'UTC' }) => {
+  const { t } = useTranslation()
   // Функция для конвертации времени в выбранный часовой пояс
   const convertToTimezone = (dateString, targetTimezone) => {
     const date = new Date(dateString)
@@ -59,7 +60,7 @@ const TimeBasedChartsGrid = ({ data, timezone = 'UTC' }) => {
 
   // Анализ по дням недели
   const weeklyData = useMemo(() => {
-    const days = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота']
+    const days = [t('weekdays.sunday'), t('weekdays.monday'), t('weekdays.tuesday'), t('weekdays.wednesday'), t('weekdays.thursday'), t('weekdays.friday'), t('weekdays.saturday')]
     const weekData = days.map((day, index) => ({
       day,
       dayIndex: index,
