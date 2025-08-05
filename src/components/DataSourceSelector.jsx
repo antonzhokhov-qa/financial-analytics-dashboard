@@ -21,19 +21,20 @@ const DataSourceSelector = ({ onSourceChange, currentSource, onReconciliationCli
         t('dataSources.features.providerData')
       ]
     },
-    {
-      id: 'api',
-      title: t('dataSources.platformAPI'),
-      description: t('dataSources.platformDescription'),
-      icon: Globe,
-      color: 'from-green-500 to-emerald-600',
-      features: [
-        t('dataSources.features.realTimeInfo'),
-        t('dataSources.features.projectFiltering'),
-        t('dataSources.features.liveData'),
-        t('dataSources.features.platformData')
-      ]
-    },
+    // Скрыт источник API платформы по запросу пользователя
+    // {
+    //   id: 'api',
+    //   title: t('dataSources.platformAPI'),
+    //   description: t('dataSources.platformDescription'),
+    //   icon: Globe,
+    //   color: 'from-green-500 to-emerald-600',
+    //   features: [
+    //     t('dataSources.features.realTimeInfo'),
+    //     t('dataSources.features.projectFiltering'),
+    //     t('dataSources.features.liveData'),
+    //     t('dataSources.features.platformData')
+    //   ]
+    // },
     {
       id: 'enhanced-api',
       title: t('dataSources.enhancedAPI'),
@@ -165,7 +166,7 @@ const DataSourceSelector = ({ onSourceChange, currentSource, onReconciliationCli
             <h3 className="text-lg font-semibold text-white">Сравнение источников</h3>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
             <div>
               <h4 className="font-semibold text-white mb-2">📂 CSV файлы (провайдер)</h4>
               <ul className="space-y-1 text-gray-300">
@@ -176,7 +177,8 @@ const DataSourceSelector = ({ onSourceChange, currentSource, onReconciliationCli
               </ul>
             </div>
             
-            <div>
+            {/* Скрыт раздел API платформы по запросу пользователя */}
+            {/* <div>
               <h4 className="font-semibold text-white mb-2">🌐 API платформы</h4>
               <ul className="space-y-1 text-gray-300">
                 <li>• Актуальные данные в реальном времени</li>
@@ -184,7 +186,7 @@ const DataSourceSelector = ({ onSourceChange, currentSource, onReconciliationCli
                 <li>• Статусы: Success, Fail</li>
                 <li>• Фильтрация по датам и проектам</li>
               </ul>
-            </div>
+            </div> */}
 
             <div>
               <h4 className="font-semibold text-white mb-2">🚀 Расширенный API <span className="text-xs bg-purple-500/30 px-2 py-1 rounded-full">НОВОЕ</span></h4>
