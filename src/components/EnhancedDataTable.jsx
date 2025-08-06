@@ -3,7 +3,7 @@ import { ChevronDown, ChevronUp, Search, Filter, Download, ExternalLink, User, C
 import { Card, CardContent } from './ui/Card'
 import { calculateEnhancedMetrics } from '../utils/analytics'
 import MetricsGrid from './MetricsGrid'
-import TimezoneInfo from './TimezoneInfo'
+
 import { useTranslation } from '../contexts/LanguageContext'
 
 const EnhancedDataTable = ({ data }) => {
@@ -222,8 +222,8 @@ const EnhancedDataTable = ({ data }) => {
       </div>
 
       {/* Детальные метрики с мультивалютностью */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-3">
+      <div className="grid grid-cols-1 gap-6">
+        <div>
           {metrics && (
             <MetricsGrid 
               metrics={metrics} 
@@ -231,9 +231,6 @@ const EnhancedDataTable = ({ data }) => {
               selectedProvider="enhanced-api"
             />
           )}
-        </div>
-        <div>
-          <TimezoneInfo data={data} showSelector={false} />
         </div>
       </div>
 
