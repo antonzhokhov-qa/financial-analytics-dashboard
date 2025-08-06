@@ -877,4 +877,109 @@ export const calculateEnhancedMetrics = async (data, dataSource = 'enhanced-api'
     depositsPercentage: total > 0 ? (operationTypeBreakdown.deposit.total / total * 100).toFixed(1) + '%' : '0%',
     withdrawsPercentage: total > 0 ? (operationTypeBreakdown.withdraw.total / total * 100).toFixed(1) + '%' : '0%'
   }
+}
+
+// Анализ по часам дня с учетом часового пояса
+export function getHourlyDistribution(data) {
+  const timezoneInfo = getTimezoneInfo()
+  const hourlyStats = {}
+  
+  // Инициализируем все часы
+  for (let hour = 0; hour < 24; hour++) {
+    hourlyStats[hour] = { total: 0, successful: 0, failed: 0, revenue: 0 }
+  }
+  
+  console.log('📊 Анализ по часам дня с учетом часового пояса:', {
+    timezone: timezoneInfo.timezone,
+    offset: timezoneInfo.offsetFormatted,
+    dataLength: data.length
+  })
+  
+  data.forEach(row => {
+    const utcDate = row.createdAtUTC || row.createdAt
+    if (!utcDate) return
+    
+    try {
+      // Получаем час в локальном часовом поясе
+      const localHour = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezoneInfo.timezone,
+        hour: 'numeric',
+        hour12: false
+      }).format(new Date(utcDate))
+      
+      const hour = parseInt(localHour)
+      
+      hourlyStats[hour].total++
+      hourlyStats[hour].revenue += parseFloat(row.amount) || 0
+      
+      const status = row.status ? row.status.toLowerCase() : ''
+      if (status === 'completed' || status === 'success') {
+        hourlyStats[hour].successful++
+      } else if (status === 'failed' || status === 'fail') {
+        hourlyStats[hour].failed++
+      }
+    } catch (error) {
+      console.warn('Ошибка анализа по часам:', error, utcDate)
+    }
+  })
+  
+  return Object.entries(hourlyStats).map(([hour, stats]) => ({
+    hour: parseInt(hour),
+    ...stats,
+    conversionRate: stats.total > 0 ? (stats.successful / stats.total) * 100 : 0
+  }))
+}
+
+// Анализ по дням недели с учетом часового пояса
+export function getWeeklyDistribution(data) {
+  const timezoneInfo = getTimezoneInfo()
+  const weeklyStats = {}
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  
+  // Инициализируем все дни недели
+  dayNames.forEach((day, index) => {
+    weeklyStats[index] = { day, total: 0, successful: 0, failed: 0, revenue: 0 }
+  })
+  
+  console.log('📊 Анализ по дням недели с учетом часового пояса:', {
+    timezone: timezoneInfo.timezone,
+    offset: timezoneInfo.offsetFormatted,
+    dataLength: data.length
+  })
+  
+  data.forEach(row => {
+    const utcDate = row.createdAtUTC || row.createdAt
+    if (!utcDate) return
+    
+    try {
+      // Получаем день недели в локальном часовом поясе
+      const localDate = new Date(utcDate)
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezoneInfo.timezone,
+        weekday: 'long'
+      })
+      
+      const dayName = formatter.format(localDate)
+      const dayIndex = dayNames.indexOf(dayName)
+      
+      if (dayIndex !== -1) {
+        weeklyStats[dayIndex].total++
+        weeklyStats[dayIndex].revenue += parseFloat(row.amount) || 0
+        
+        const status = row.status ? row.status.toLowerCase() : ''
+        if (status === 'completed' || status === 'success') {
+          weeklyStats[dayIndex].successful++
+        } else if (status === 'failed' || status === 'fail') {
+          weeklyStats[dayIndex].failed++
+        }
+      }
+    } catch (error) {
+      console.warn('Ошибка анализа по дням недели:', error, utcDate)
+    }
+  })
+  
+  return Object.values(weeklyStats).map(stats => ({
+    ...stats,
+    conversionRate: stats.total > 0 ? (stats.successful / stats.total) * 100 : 0
+  }))
 } 

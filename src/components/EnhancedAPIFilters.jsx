@@ -4,6 +4,7 @@ import { Search, Calendar, Database, CreditCard, Globe, Coins, Filter, RefreshCw
 import { Card, CardContent, CardTitle } from './ui/Card'
 import { Button } from './ui/Button'
 import { useTranslation } from '../contexts/LanguageContext'
+import { getStartOfDayInUTC, getEndOfDayInUTC, getTimezoneInfo } from '../utils/timezoneUtils'
 
 const EnhancedAPIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) => {
   const { t } = useTranslation()
@@ -96,6 +97,14 @@ const EnhancedAPIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) 
       }
 
       // Настройка фильтров в зависимости от режима дат
+      // Важно: конвертируем локальные даты пользователя в UTC для API запросов
+      const timezoneInfo = getTimezoneInfo()
+      console.log('🌍 Конвертация дат для API запроса:', {
+        timezone: timezoneInfo.timezone,
+        offset: timezoneInfo.offsetFormatted,
+        dateMode: filters.dateMode
+      })
+
       switch (filters.dateMode) {
         case 'latest':
           apiFilters.count = filters.count
@@ -107,7 +116,20 @@ const EnhancedAPIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) 
             setLoading(false)
             return
           }
-          apiFilters.date = filters.date
+          // Конвертируем локальную дату в UTC диапазон (начало и конец дня)
+          const selectedDate = new Date(filters.date)
+          const utcStartOfDay = getStartOfDayInUTC(selectedDate)
+          const utcEndOfDay = getEndOfDayInUTC(selectedDate)
+          
+          console.log('📅 Конвертация одной даты:', {
+            localDate: filters.date,
+            utcStart: utcStartOfDay,
+            utcEnd: utcEndOfDay
+          })
+          
+          // Используем диапазон для точного попадания в день пользователя
+          apiFilters.from = utcStartOfDay
+          apiFilters.to = utcEndOfDay
           break
         
         case 'range':
@@ -116,8 +138,21 @@ const EnhancedAPIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) 
             setLoading(false)
             return
           }
-          apiFilters.from = filters.from
-          apiFilters.to = filters.to
+          // Конвертируем диапазон дат в UTC
+          const fromDate = new Date(filters.from)
+          const toDate = new Date(filters.to)
+          const utcFromStart = getStartOfDayInUTC(fromDate)
+          const utcToEnd = getEndOfDayInUTC(toDate)
+          
+          console.log('📅 Конвертация диапазона дат:', {
+            localFrom: filters.from,
+            localTo: filters.to,
+            utcFromStart: utcFromStart,
+            utcToEnd: utcToEnd
+          })
+          
+          apiFilters.from = utcFromStart
+          apiFilters.to = utcToEnd
           break
       }
 
@@ -381,6 +416,24 @@ const EnhancedAPIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) 
                 </>
               )}
             </div>
+
+            {/* Информация о часовом поясе */}
+            {(filters.dateMode === 'single' || filters.dateMode === 'range') && (
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                <div className="flex items-start space-x-2">
+                  <Globe className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm">
+                    <p className="text-blue-200 font-medium mb-1">
+                      Фильтрация по часовому поясу
+                    </p>
+                    <p className="text-blue-200/80">
+                      Выбранные даты автоматически конвертируются в UTC для точного поиска. 
+                      Ваш часовой пояс: <span className="font-mono">{getTimezoneInfo().offsetFormatted}</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Расширенные фильтры */}
             <div className="border-t border-white/10 pt-4">

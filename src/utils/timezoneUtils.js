@@ -118,29 +118,27 @@ export function getStartOfDayInUTC(date) {
   const timezone = getUserTimezone()
   
   try {
-    // Получаем начало дня в пользовательском часовом поясе
-    const startOfDay = new Date(date)
-    startOfDay.setHours(0, 0, 0, 0)
+    // Создаем дату начала дня в локальном часовом поясе
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
     
-    // Конвертируем обратно в UTC для API запроса
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    })
+    // Создаем локальную дату начала дня
+    const localStartString = `${year}-${month}-${day}T00:00:00`
     
-    const localDateString = formatter.format(startOfDay)
-    const utcStartOfDay = new Date(`${localDateString}T00:00:00.000Z`)
+    // Конвертируем в UTC с учетом часового пояса
+    const tempDate = new Date(localStartString)
+    const offsetMinutes = tempDate.getTimezoneOffset()
     
-    // Корректируем на разницу часовых поясов
-    const offsetMinutes = getTimezoneOffset()
-    utcStartOfDay.setMinutes(utcStartOfDay.getMinutes() + offsetMinutes)
+    // Создаем UTC дату с корректировкой на часовой пояс
+    const utcStart = new Date(tempDate.getTime() + (offsetMinutes * 60 * 1000))
     
-    return utcStartOfDay.toISOString()
+    return utcStart.toISOString()
   } catch (error) {
     console.error('Error getting start of day in UTC:', error)
-    return date.toISOString()
+    const fallback = new Date(date)
+    fallback.setHours(0, 0, 0, 0)
+    return fallback.toISOString()
   }
 }
 
@@ -153,29 +151,27 @@ export function getEndOfDayInUTC(date) {
   const timezone = getUserTimezone()
   
   try {
-    // Получаем конец дня в пользовательском часовом поясе
-    const endOfDay = new Date(date)
-    endOfDay.setHours(23, 59, 59, 999)
+    // Создаем дату конца дня в локальном часовом поясе
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
     
-    // Конвертируем обратно в UTC для API запроса
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    })
+    // Создаем локальную дату конца дня
+    const localEndString = `${year}-${month}-${day}T23:59:59.999`
     
-    const localDateString = formatter.format(endOfDay)
-    const utcEndOfDay = new Date(`${localDateString}T23:59:59.999Z`)
+    // Конвертируем в UTC с учетом часового пояса
+    const tempDate = new Date(localEndString)
+    const offsetMinutes = tempDate.getTimezoneOffset()
     
-    // Корректируем на разницу часовых поясов
-    const offsetMinutes = getTimezoneOffset()
-    utcEndOfDay.setMinutes(utcEndOfDay.getMinutes() + offsetMinutes)
+    // Создаем UTC дату с корректировкой на часовой пояс
+    const utcEnd = new Date(tempDate.getTime() + (offsetMinutes * 60 * 1000))
     
-    return utcEndOfDay.toISOString()
+    return utcEnd.toISOString()
   } catch (error) {
     console.error('Error getting end of day in UTC:', error)
-    return date.toISOString()
+    const fallback = new Date(date)
+    fallback.setHours(23, 59, 59, 999)
+    return fallback.toISOString()
   }
 }
 
