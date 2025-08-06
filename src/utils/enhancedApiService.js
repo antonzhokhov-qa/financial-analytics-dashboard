@@ -1,5 +1,12 @@
 // Расширенный API сервис для работы с обновленным коллектором
 import { collectorAPI, normalizeAPIData } from './apiService'
+import { 
+  formatDateInUserTimezone, 
+  convertUTCToUserTimezone,
+  getTimezoneInfo,
+  groupTransactionsByDay,
+  shouldShowTimezoneWarning
+} from './timezoneUtils'
 
 class EnhancedCollectorAPI {
   constructor() {
@@ -574,10 +581,19 @@ function normalizeEnhancedOperations(apiData) {
       hasRates: false,
       
       // Время из реальной структуры API
-      createdAt: operation.operation_created_at || operation.date || new Date().toISOString(),
-      modifiedAt: operation.operation_modified_at || operation.operation_updated_at || operation.date || new Date().toISOString(),
-      completeCreatedAt: operation.operation_created_at || operation.date || new Date().toISOString(),
-      completeModifiedAt: operation.operation_modified_at || operation.operation_updated_at || operation.date || new Date().toISOString(),
+      // Оригинальные UTC времена (для API запросов)
+      createdAtUTC: operation.operation_created_at || operation.date || new Date().toISOString(),
+      modifiedAtUTC: operation.operation_modified_at || operation.operation_updated_at || operation.date || new Date().toISOString(),
+      
+      // Времена в часовом поясе пользователя (для отображения)
+      createdAt: formatDateInUserTimezone(operation.operation_created_at || operation.date),
+      modifiedAt: formatDateInUserTimezone(operation.operation_modified_at || operation.operation_updated_at || operation.date),
+      completeCreatedAt: formatDateInUserTimezone(operation.operation_created_at || operation.date),
+      completeModifiedAt: formatDateInUserTimezone(operation.operation_modified_at || operation.operation_updated_at || operation.date),
+      
+      // Локальные объекты Date для аналитики
+      createdAtLocal: convertUTCToUserTimezone(operation.operation_created_at || operation.date),
+      modifiedAtLocal: convertUTCToUserTimezone(operation.operation_modified_at || operation.operation_updated_at || operation.date),
       
       // Callback информация
       callbacks: [],
@@ -690,6 +706,23 @@ function normalizeEnhancedOperations(apiData) {
       currencies: Array.from(merchantAnalysis[merchant].currencies)
     }))
   })
+
+  // Добавляем информацию о часовом поясе и группировку по дням
+  const timezoneInfo = getTimezoneInfo()
+  const groupedByDay = groupTransactionsByDay(normalized)
+  
+  console.log('🌍 Timezone conversion completed:', {
+    userTimezone: timezoneInfo.timezone,
+    offset: timezoneInfo.offsetFormatted,
+    shouldShowWarning: shouldShowTimezoneWarning(normalized),
+    daysWithTransactions: Object.keys(groupedByDay).length,
+    totalTransactions: normalized.length
+  })
+
+  // Добавляем метаинформацию к результату
+  normalized._timezone = timezoneInfo
+  normalized._groupedByDay = groupedByDay
+  normalized._hasRecentTransactions = shouldShowTimezoneWarning(normalized)
 
   return normalized
 }

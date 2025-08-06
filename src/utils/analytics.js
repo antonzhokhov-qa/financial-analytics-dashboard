@@ -1,4 +1,10 @@
 import currencyService from './currencyService.js'
+import { 
+  convertUTCToUserTimezone, 
+  formatDateInUserTimezone,
+  groupTransactionsByDay,
+  getTimezoneInfo
+} from './timezoneUtils.js'
 
 // Функция расчета метрик с поддержкой провайдеров
 export const calculateMetrics = (data, dataTypeOrProvider = 'merchant') => {
@@ -343,18 +349,50 @@ export function getPaymentMethodDistribution(data) {
 }
 
 export function getTimeSeriesData(data) {
-  // Группировка данных по времени
+  // Группировка данных по времени с учетом часового пояса пользователя
+  const timezoneInfo = getTimezoneInfo()
   const timeGroups = {}
+  
+  console.log('📊 Анализ временных рядов с учетом часового пояса:', {
+    timezone: timezoneInfo.timezone,
+    offset: timezoneInfo.offsetFormatted,
+    dataLength: data.length
+  })
   
   data.forEach(row => {
     let date
-    if (row.createdAt) {
-      // Парсим дату создания
-      const dateStr = row.createdAt.split(' ')[0] // Берем только дату
-      date = dateStr
+    
+    // Используем UTC поля если доступны, иначе локальные
+    const utcDate = row.createdAtUTC || row.createdAt
+    
+    if (utcDate) {
+      try {
+        // Конвертируем UTC время в пользовательский часовой пояс
+        const localDate = convertUTCToUserTimezone(utcDate)
+        if (localDate) {
+          // Получаем дату в формате YYYY-MM-DD в пользовательском часовом поясе
+          date = new Intl.DateTimeFormat('en-CA', {
+            timeZone: timezoneInfo.timezone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+          }).format(new Date(utcDate))
+        } else {
+          // Fallback к парсингу строки
+          const dateStr = utcDate.split(' ')[0] || utcDate.split('T')[0]
+          date = dateStr
+        }
+      } catch (error) {
+        console.warn('Ошибка конвертации времени:', error, utcDate)
+        // Fallback к простому парсингу
+        const dateStr = utcDate.split(' ')[0] || utcDate.split('T')[0]
+        date = dateStr
+      }
     } else {
-      // Если нет даты создания, используем текущую дату
-      date = new Date().toISOString().split('T')[0]
+      // Если нет даты создания, используем текущую дату в пользовательском часовом поясе
+      date = new Intl.DateTimeFormat('en-CA', {
+        timeZone: timezoneInfo.timezone
+      }).format(new Date())
     }
     
     if (!timeGroups[date]) {
@@ -374,11 +412,19 @@ export function getTimeSeriesData(data) {
     }
   })
   
-  return Object.entries(timeGroups).map(([date, stats]) => ({
+  const result = Object.entries(timeGroups).map(([date, stats]) => ({
     date,
     ...stats,
-    conversionRate: (stats.completed / stats.total) * 100
-  }))
+    conversionRate: stats.total > 0 ? (stats.completed / stats.total) * 100 : 0
+  })).sort((a, b) => a.date.localeCompare(b.date))
+  
+  console.log('📈 Результат анализа временных рядов:', {
+    daysAnalyzed: result.length,
+    totalTransactions: result.reduce((sum, day) => sum + day.total, 0),
+    sampleDays: result.slice(0, 3)
+  })
+  
+  return result
 }
 
 export function getTopUsers(data, limit = 10) {
