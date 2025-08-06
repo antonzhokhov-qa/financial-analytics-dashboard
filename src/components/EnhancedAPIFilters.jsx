@@ -4,7 +4,46 @@ import { Search, Calendar, Database, CreditCard, Globe, Coins, Filter, RefreshCw
 import { Card, CardContent, CardTitle } from './ui/Card'
 import { Button } from './ui/Button'
 import { useTranslation } from '../contexts/LanguageContext'
-import { getStartOfDayInUTC, getEndOfDayInUTC, getTimezoneInfo } from '../utils/timezoneUtils'
+import { getStartOfDayInUTC, getEndOfDayInUTC, getTimezoneInfo, convertUTCToUserTimezone } from '../utils/timezoneUtils'
+
+// Функция фильтрации данных по локальному времени пользователя
+const filterDataByLocalTimezone = (data, filters) => {
+  if (filters.dateMode === 'latest') {
+    // Для режима "последние" не фильтруем
+    return data
+  }
+
+  const timezoneInfo = getTimezoneInfo()
+  
+  return data.filter(item => {
+    const utcDate = item.createdAtUTC || item.operation_created_at
+    if (!utcDate) return true // Если нет даты, оставляем элемент
+
+    try {
+      // Конвертируем UTC время в локальную дату
+      const localDate = new Date(utcDate)
+      const localDateString = new Intl.DateTimeFormat('en-CA', {
+        timeZone: timezoneInfo.timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(localDate)
+
+      if (filters.dateMode === 'single') {
+        // Проверяем, попадает ли транзакция в выбранный день по локальному времени
+        return localDateString === filters.date
+      } else if (filters.dateMode === 'range') {
+        // Проверяем, попадает ли транзакция в диапазон по локальному времени
+        return localDateString >= filters.from && localDateString <= filters.to
+      }
+
+      return true
+    } catch (error) {
+      console.warn('Error filtering by local timezone:', error, item)
+      return true // В случае ошибки оставляем элемент
+    }
+  })
+}
 
 const EnhancedAPIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) => {
   const { t } = useTranslation()
@@ -97,14 +136,6 @@ const EnhancedAPIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) 
       }
 
       // Настройка фильтров в зависимости от режима дат
-      // Важно: конвертируем локальные даты пользователя в UTC для API запросов
-      const timezoneInfo = getTimezoneInfo()
-      console.log('🌍 Конвертация дат для API запроса:', {
-        timezone: timezoneInfo.timezone,
-        offset: timezoneInfo.offsetFormatted,
-        dateMode: filters.dateMode
-      })
-
       switch (filters.dateMode) {
         case 'latest':
           apiFilters.count = filters.count
@@ -116,15 +147,6 @@ const EnhancedAPIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) 
             setLoading(false)
             return
           }
-          
-          // Для одной даты используем простой подход - отправляем локальную дату как есть
-          // API сам обработает её как диапазон на стороне сервера
-          console.log('📅 Конвертация одной даты:', {
-            localDate: filters.date,
-            sentToAPI: filters.date
-          })
-          
-          // Отправляем локальную дату в API - API сам определит диапазон
           apiFilters.date = filters.date
           break
         
@@ -134,14 +156,6 @@ const EnhancedAPIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) 
             setLoading(false)
             return
           }
-          
-          console.log('📅 Диапазон дат:', {
-            localFrom: filters.from,
-            localTo: filters.to,
-            sentToAPI: { from: filters.from, to: filters.to }
-          })
-          
-          // Отправляем локальные даты в API - пусть API сам обрабатывает часовые пояса
           apiFilters.from = filters.from
           apiFilters.to = filters.to
           break
@@ -163,8 +177,17 @@ const EnhancedAPIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) 
         successfulCount: normalizedData.filter(d => d.isCompleted).length,
         sampleItem: normalizedData[0] || null
       })
+
+      // Дополнительная фильтрация по локальному времени пользователя
+      const filteredData = filterDataByLocalTimezone(normalizedData, filters)
+      console.log('🌍 Data filtered by local timezone:', {
+        originalLength: normalizedData.length,
+        filteredLength: filteredData.length,
+        timezone: getTimezoneInfo().timezone,
+        filters: { dateMode: filters.dateMode, date: filters.date, from: filters.from, to: filters.to }
+      })
       
-      onDataLoad(normalizedData, 'enhanced-api')
+      onDataLoad(filteredData, 'enhanced-api')
       
     } catch (err) {
       console.error('Failed to load enhanced API data:', err)
@@ -415,11 +438,12 @@ const EnhancedAPIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) 
                   <Globe className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
                   <div className="text-sm">
                     <p className="text-blue-200 font-medium mb-1">
-                      Фильтрация по датам
+                      Умная фильтрация по часовому поясу
                     </p>
                     <p className="text-blue-200/80">
-                      Выбранные даты отправляются на сервер в вашем локальном часовом поясе. 
-                      Ваш часовой пояс: <span className="font-mono">{getTimezoneInfo().offsetFormatted}</span>
+                      Данные загружаются с сервера, затем фильтруются по вашему локальному времени. 
+                      Показываются только транзакции, которые попадают в выбранную дату по времени 
+                      <span className="font-mono"> {getTimezoneInfo().offsetFormatted}</span>
                     </p>
                   </div>
                 </div>
