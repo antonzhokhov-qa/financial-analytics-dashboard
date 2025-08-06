@@ -116,20 +116,16 @@ const EnhancedAPIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) 
             setLoading(false)
             return
           }
-          // Конвертируем локальную дату в UTC диапазон (начало и конец дня)
-          const selectedDate = new Date(filters.date)
-          const utcStartOfDay = getStartOfDayInUTC(selectedDate)
-          const utcEndOfDay = getEndOfDayInUTC(selectedDate)
           
+          // Для одной даты используем простой подход - отправляем локальную дату как есть
+          // API сам обработает её как диапазон на стороне сервера
           console.log('📅 Конвертация одной даты:', {
             localDate: filters.date,
-            utcStart: utcStartOfDay,
-            utcEnd: utcEndOfDay
+            sentToAPI: filters.date
           })
           
-          // Используем диапазон для точного попадания в день пользователя
-          apiFilters.from = utcStartOfDay
-          apiFilters.to = utcEndOfDay
+          // Отправляем локальную дату в API - API сам определит диапазон
+          apiFilters.date = filters.date
           break
         
         case 'range':
@@ -138,21 +134,16 @@ const EnhancedAPIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) 
             setLoading(false)
             return
           }
-          // Конвертируем диапазон дат в UTC
-          const fromDate = new Date(filters.from)
-          const toDate = new Date(filters.to)
-          const utcFromStart = getStartOfDayInUTC(fromDate)
-          const utcToEnd = getEndOfDayInUTC(toDate)
           
-          console.log('📅 Конвертация диапазона дат:', {
+          console.log('📅 Диапазон дат:', {
             localFrom: filters.from,
             localTo: filters.to,
-            utcFromStart: utcFromStart,
-            utcToEnd: utcToEnd
+            sentToAPI: { from: filters.from, to: filters.to }
           })
           
-          apiFilters.from = utcFromStart
-          apiFilters.to = utcToEnd
+          // Отправляем локальные даты в API - пусть API сам обрабатывает часовые пояса
+          apiFilters.from = filters.from
+          apiFilters.to = filters.to
           break
       }
 
@@ -424,10 +415,10 @@ const EnhancedAPIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) 
                   <Globe className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
                   <div className="text-sm">
                     <p className="text-blue-200 font-medium mb-1">
-                      Фильтрация по часовому поясу
+                      Фильтрация по датам
                     </p>
                     <p className="text-blue-200/80">
-                      Выбранные даты автоматически конвертируются в UTC для точного поиска. 
+                      Выбранные даты отправляются на сервер в вашем локальном часовом поясе. 
                       Ваш часовой пояс: <span className="font-mono">{getTimezoneInfo().offsetFormatted}</span>
                     </p>
                   </div>
