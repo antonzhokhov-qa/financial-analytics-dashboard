@@ -4,7 +4,7 @@ import { Search, Calendar, Database, CreditCard, Globe, Coins, Filter, RefreshCw
 import { Card, CardContent, CardTitle } from './ui/Card'
 import { Button } from './ui/Button'
 import { useTranslation } from '../contexts/LanguageContext'
-import { getStartOfDayInUTC, getEndOfDayInUTC, getTimezoneInfo, convertUTCToUserTimezone } from '../utils/timezoneUtils'
+import { getStartOfDayInUTC, getEndOfDayInUTC, getTimezoneInfo, convertUTCToUserTimezone, expandSingleDateForAPI, expandDateRangeForAPI } from '../utils/timezoneUtils'
 
 // Функция фильтрации данных по локальному времени пользователя
 const filterDataByLocalTimezone = (data, filters) => {
@@ -136,6 +136,7 @@ const EnhancedAPIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) 
       }
 
       // Настройка фильтров в зависимости от режима дат
+      // Для одиночной даты и диапазона расширяем запрос для захвата граничных транзакций
       switch (filters.dateMode) {
         case 'latest':
           apiFilters.count = filters.count
@@ -147,7 +148,10 @@ const EnhancedAPIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) 
             setLoading(false)
             return
           }
-          apiFilters.date = filters.date
+          // Расширяем одну дату до диапазона для захвата транзакций из соседних дней
+          const expandedSingle = expandSingleDateForAPI(filters.date)
+          apiFilters.from = expandedSingle.from
+          apiFilters.to = expandedSingle.to
           break
         
         case 'range':
@@ -156,8 +160,10 @@ const EnhancedAPIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) 
             setLoading(false)
             return
           }
-          apiFilters.from = filters.from
-          apiFilters.to = filters.to
+          // Расширяем диапазон для захвата граничных транзакций
+          const expandedRange = expandDateRangeForAPI(filters.from, filters.to)
+          apiFilters.from = expandedRange.from
+          apiFilters.to = expandedRange.to
           break
       }
 
@@ -438,12 +444,13 @@ const EnhancedAPIFilters = ({ onDataLoad, loading, setLoading, onBack = null }) 
                   <Globe className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
                   <div className="text-sm">
                     <p className="text-blue-200 font-medium mb-1">
-                      Умная фильтрация по часовому поясу
+                      Умная фильтрация с расширенным диапазоном
                     </p>
                     <p className="text-blue-200/80">
-                      Данные загружаются с сервера, затем фильтруются по вашему локальному времени. 
-                      Показываются только транзакции, которые попадают в выбранную дату по времени 
-                      <span className="font-mono"> {getTimezoneInfo().offsetFormatted}</span>
+                      Запрашиваем данные с соседних дней для захвата всех транзакций, 
+                      затем фильтруем по вашему локальному времени 
+                      <span className="font-mono">{getTimezoneInfo().offsetFormatted}</span>. 
+                      Это гарантирует, что не пропустим транзакции с 00:00-03:00 по МСК.
                     </p>
                   </div>
                 </div>

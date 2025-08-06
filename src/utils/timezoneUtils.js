@@ -276,6 +276,76 @@ export function shouldShowTimezoneWarning(transactions) {
   })
 }
 
+// Функции для расширения диапазона API запросов с учетом часовых поясов
+
+/**
+ * Расширяет одну дату до диапазона для захвата транзакций из соседних дней
+ * @param {string} dateString - Дата в формате 'yyyy-MM-dd'
+ * @returns {object} - { from: 'yyyy-MM-dd', to: 'yyyy-MM-dd' }
+ */
+export function expandSingleDateForAPI(dateString) {
+  try {
+    const date = new Date(dateString + 'T12:00:00') // Полдень выбранного дня
+    
+    // Добавляем один день до и один день после для захвата граничных транзакций
+    const dayBefore = new Date(date)
+    dayBefore.setDate(date.getDate() - 1)
+    
+    const dayAfter = new Date(date)
+    dayAfter.setDate(date.getDate() + 1)
+    
+    const from = new Intl.DateTimeFormat('en-CA').format(dayBefore) // yyyy-MM-dd
+    const to = new Intl.DateTimeFormat('en-CA').format(dayAfter) // yyyy-MM-dd
+    
+    console.log('📅 Расширение одной даты для API:', {
+      original: dateString,
+      expanded: { from, to },
+      reason: 'Захват транзакций из соседних дней для учета часовых поясов'
+    })
+    
+    return { from, to }
+  } catch (error) {
+    console.error('Ошибка расширения даты:', error)
+    // В случае ошибки возвращаем исходную дату
+    return { from: dateString, to: dateString }
+  }
+}
+
+/**
+ * Расширяет диапазон дат для захвата транзакций из граничных дней
+ * @param {string} fromDate - Начальная дата в формате 'yyyy-MM-dd'
+ * @param {string} toDate - Конечная дата в формате 'yyyy-MM-dd'
+ * @returns {object} - { from: 'yyyy-MM-dd', to: 'yyyy-MM-dd' }
+ */
+export function expandDateRangeForAPI(fromDate, toDate) {
+  try {
+    const startDate = new Date(fromDate + 'T12:00:00')
+    const endDate = new Date(toDate + 'T12:00:00')
+    
+    // Добавляем один день до начала и один день после конца
+    const dayBefore = new Date(startDate)
+    dayBefore.setDate(startDate.getDate() - 1)
+    
+    const dayAfter = new Date(endDate)
+    dayAfter.setDate(endDate.getDate() + 1)
+    
+    const from = new Intl.DateTimeFormat('en-CA').format(dayBefore)
+    const to = new Intl.DateTimeFormat('en-CA').format(dayAfter)
+    
+    console.log('📅 Расширение диапазона дат для API:', {
+      original: { from: fromDate, to: toDate },
+      expanded: { from, to },
+      reason: 'Захват граничных транзакций для учета часовых поясов'
+    })
+    
+    return { from, to }
+  } catch (error) {
+    console.error('Ошибка расширения диапазона:', error)
+    // В случае ошибки возвращаем исходный диапазон
+    return { from: fromDate, to: toDate }
+  }
+}
+
 // Экспорт по умолчанию
 export default {
   getUserTimezone,
@@ -287,5 +357,7 @@ export default {
   getTimezoneInfo,
   groupTransactionsByDay,
   getPopularTimezones,
-  shouldShowTimezoneWarning
+  shouldShowTimezoneWarning,
+  expandSingleDateForAPI,
+  expandDateRangeForAPI
 }
